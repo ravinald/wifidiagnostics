@@ -26,5 +26,7 @@
     <string>WiFi Diagnostics needs access to location services to retrieve detailed WiFi network information including BSSID and perform network scans.</string>
     <key>NSLocationUsageDescription</key>
     <string>WiFi Diagnostics needs access to location services to retrieve detailed WiFi network information including BSSID and perform network scans.</string>
+    <key>LSUIElement</key>
+    <true/>
 </dict>
 </plist>
