@@ -117,10 +117,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var diagnosticsWindow: NSWindow?
     private var aboutWindow: NSWindow?
     private var progressWindow: ProgressWindowController?
+    private var startupDialogWindow: StartupDialogWindowController?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Check if user has chosen to hide the startup dialog
+        if !UserDefaults.standard.bool(forKey: "hideStartupDialog") {
+            showStartupDialog()
+        } else {
+            setupMenuBar()
+            requestNotificationPermission()
+        }
+    }
+    
+    private func showStartupDialog() {
+        startupDialogWindow = StartupDialogWindowController()
+        startupDialogWindow?.show()
+        
+        // Observe when the window closes to set up the app
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(startupDialogClosed),
+            name: NSWindow.willCloseNotification,
+            object: startupDialogWindow?.window
+        )
+    }
+    
+    @objc private func startupDialogClosed() {
+        // Always set up the menu bar when dialog closes
         setupMenuBar()
         requestNotificationPermission()
+        
+        // Remove observer
+        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: startupDialogWindow?.window)
     }
     
     private func requestNotificationPermission() {
@@ -176,9 +204,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenu() {
         let menu = NSMenu()
         
+        menu.addItem(NSMenuItem(title: "About WiFi Diagnostics", action: #selector(showAbout), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Generate WiFi Diagnostics", action: #selector(generateDiagnostics), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "About WiFi Diagnostics", action: #selector(showAbout), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Settings", action: #selector(showSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         
@@ -402,6 +432,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func openLocationSettings() {
         LocationPermissionManager.openLocationServicesSettings()
+    }
+    
+    @objc private func showSettings() {
+        // Close any existing startup dialog window
+        if let existingWindow = startupDialogWindow?.window {
+            existingWindow.close()
+        }
+        
+        // Show the startup dialog
+        showStartupDialog()
     }
     
     @objc private func showAbout() {
