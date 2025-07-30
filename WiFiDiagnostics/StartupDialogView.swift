@@ -52,7 +52,7 @@ struct StartupDialogView: View {
                     
                     Text("Required for WiFi scanning and detailed network information")
                         .font(.subheadline)
-                        .foregroundColor(.black)
+                        .foregroundColor(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 
@@ -68,7 +68,7 @@ struct StartupDialogView: View {
                     
                     Text("Automatically start WiFi Diagnostics when you log in")
                         .font(.subheadline)
-                        .foregroundColor(.black)
+                        .foregroundColor(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 
@@ -84,12 +84,12 @@ struct StartupDialogView: View {
                     
                     Text("Close dialog and run in the menubar")
                         .font(.subheadline)
-                        .foregroundColor(.black)
+                        .foregroundColor(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding()
-            .background(Color.white)
+            .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(8)
             
             Spacer()
@@ -112,7 +112,7 @@ struct StartupDialogView: View {
         }
         .padding(30)
         .frame(width: 600, height: 550)
-        .background(Color.white)
+        .background(Color(NSColor.windowBackgroundColor))
     }
     
     private func grantLocationPermissions() {

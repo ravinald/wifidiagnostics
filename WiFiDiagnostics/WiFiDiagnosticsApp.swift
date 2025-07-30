@@ -447,7 +447,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showAbout() {
         if aboutWindow == nil {
             aboutWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                contentRect: NSRect(x: 0, y: 0, width: 400, height: 350),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
@@ -482,7 +482,7 @@ struct AboutView: View {
                 .fontWeight(.semibold)
             
             // Version
-            Text("Version 1.0")
+            Text("Version \(BuildInfo.fullVersion)")
                 .font(.body)
                 .foregroundColor(.secondary)
             
@@ -491,6 +491,12 @@ struct AboutView: View {
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
+            
+            // GitHub URL
+            Link("https://github.com/ravinald/wifidiagnostics",
+                 destination: URL(string: "https://github.com/ravinald/wifidiagnostics")!)
+                .font(.caption)
+                .foregroundColor(.accentColor)
             
             Spacer()
                 .frame(height: 8)
@@ -504,9 +510,25 @@ struct AboutView: View {
                 Text("All rights reserved.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                
+                Spacer()
+                    .frame(height: 8)
+                
+                Text("Licensed under the Apache License, Version 2.0")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Text("You may obtain a copy of the License at:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Link("http://www.apache.org/licenses/LICENSE-2.0", 
+                     destination: URL(string: "http://www.apache.org/licenses/LICENSE-2.0")!)
+                    .font(.caption)
+                    .foregroundColor(.accentColor)
             }
         }
         .padding(.vertical, 30)
-        .frame(width: 400, height: 300)
+        .frame(width: 400, height: 350)
     }
 }
