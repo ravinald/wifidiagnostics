@@ -74,7 +74,7 @@ struct rt_metrics {
 }
 
 // Location Manager for handling location permissions
-class LocationPermissionManager: NSObject, CLLocationManagerDelegate {
+class LocationPermissionManager: NSObject, CLLocationManagerDelegate, ObservableObject {
     private let locationManager = CLLocationManager()
     private var completion: ((Bool) -> Void)?
     
@@ -90,13 +90,20 @@ class LocationPermissionManager: NSObject, CLLocationManagerDelegate {
         let status = locationManager.authorizationStatus
         
         switch status {
-        case .authorized, .authorizedAlways:
+        case .authorized, .authorizedAlways, .authorizedWhenInUse:
             completion(true)
         case .denied, .restricted:
             completion(false)
         case .notDetermined:
             // Request permission
             locationManager.requestWhenInUseAuthorization()
+            // Safety timeout: if macOS doesn't show a prompt or the delegate
+            // callback never fires, fall back after a few seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                guard let self = self, let completion = self.completion else { return }
+                self.completion = nil
+                completion(false)
+            }
         @unknown default:
             completion(false)
         }
@@ -106,7 +113,7 @@ class LocationPermissionManager: NSObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         switch status {
-        case .authorized, .authorizedAlways:
+        case .authorized, .authorizedAlways, .authorizedWhenInUse:
             completion?(true)
         case .denied, .restricted:
             completion?(false)
@@ -131,14 +138,103 @@ class LocationPermissionManager: NSObject, CLLocationManagerDelegate {
     }
 }
 
+class PhaseProgressTracker {
+    enum DiagnosticPhase: CaseIterable {
+        case wifiInfo
+        case networkInterfaces
+        case activeConnections
+        case dnsTests
+        case pingTests
+        case dhcpLease
+        case captivePortal
+        case mdns
+        case security
+        case finalizing
+
+        var weight: Double {
+            switch self {
+            case .dnsTests: return 0.28
+            case .pingTests: return 0.22
+            case .wifiInfo: return 0.12
+            case .networkInterfaces: return 0.08
+            case .activeConnections: return 0.08
+            case .dhcpLease: return 0.04
+            case .captivePortal: return 0.04
+            case .mdns: return 0.04
+            case .security: return 0.06
+            case .finalizing: return 0.04
+            }
+        }
+
+        var displayName: String {
+            switch self {
+            case .wifiInfo: return "WiFi Info"
+            case .networkInterfaces: return "Network Interfaces"
+            case .activeConnections: return "Active Connections"
+            case .dnsTests: return "DNS Tests"
+            case .pingTests: return "Ping Tests"
+            case .dhcpLease: return "DHCP Lease"
+            case .captivePortal: return "Captive Portal"
+            case .mdns: return "mDNS Discovery"
+            case .security: return "Security"
+            case .finalizing: return "Finalizing"
+            }
+        }
+    }
+
+    private let queue = DispatchQueue(label: "com.wifidiagnostics.phasetracker")
+    private var phaseProgress: [DiagnosticPhase: Double] = [:]
+    private var activeMessages: [DiagnosticPhase: String] = [:]
+    private var isComplete = false
+    var handler: ((Double, String) -> Void)?
+
+    func update(phase: DiagnosticPhase, progress: Double, detail: String) {
+        let result: (Double, String)? = queue.sync {
+            guard !isComplete else { return nil }
+            phaseProgress[phase] = min(max(progress, 0.0), 1.0)
+            if progress < 1.0 {
+                activeMessages[phase] = "\(phase.displayName) \u{2014} \(detail)"
+            } else {
+                activeMessages.removeValue(forKey: phase)
+            }
+            // Show the highest-weight phase that is still active
+            let message = activeMessages
+                .max(by: { $0.key.weight < $1.key.weight })?
+                .value ?? "\(phase.displayName) \u{2014} \(detail)"
+            let overall = computeOverall_locked()
+            return (overall, message)
+        }
+        if let (overall, message) = result {
+            handler?(overall, message)
+        }
+    }
+
+    func complete() {
+        queue.sync {
+            isComplete = true
+        }
+        handler?(1.0, "Report complete")
+    }
+
+    /// Must be called while already holding `queue`.
+    private func computeOverall_locked() -> Double {
+        var total = 0.0
+        for phase in DiagnosticPhase.allCases {
+            total += (phaseProgress[phase] ?? 0.0) * phase.weight
+        }
+        return min(total, 1.0)
+    }
+}
+
 class WiFiDiagnosticsCollector {
     private var logEntries: [String] = []
+    private let logQueue = DispatchQueue(label: "com.wifidiagnostics.log")
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss.SSS"
         return formatter
     }()
-    
+
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 10.0
@@ -147,21 +243,84 @@ class WiFiDiagnosticsCollector {
         queue.qualityOfService = .userInitiated
         return URLSession(configuration: config, delegate: nil, delegateQueue: queue)
     }()
-    
+
     private var isCancelled = false
     private var progressHandler: ((Double, String) -> Void)?
     private let progressQueue = DispatchQueue(label: "com.wifidiagnostics.progress")
+    private var currentProgress: Double = 0.0
     private let locationManager = LocationPermissionManager()
-    
+    private var phaseTracker: PhaseProgressTracker?
+    private let pingCount = 5
+
+    private lazy var dynamicStore: SCDynamicStore? = {
+        SCDynamicStoreCreate(nil, "WiFiDiagnostics" as CFString, nil, nil)
+    }()
+
+    private lazy var cachedGateway: String? = {
+        guard let store = dynamicStore else { return nil }
+        let key = "State:/Network/Global/IPv4" as CFString
+        if let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any],
+           let router = dict["Router"] as? String {
+            return router
+        }
+        return nil
+    }()
+
+    private lazy var cachedDNSServers: [String] = {
+        guard let store = dynamicStore else { return [] }
+        let key = "State:/Network/Global/DNS" as CFString
+        if let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any],
+           let servers = dict["ServerAddresses"] as? [String] {
+            return servers
+        }
+        return []
+    }()
+
+    private lazy var cachedDNSSearchDomains: [String] = {
+        guard let store = dynamicStore else { return [] }
+        let key = "State:/Network/Global/DNS" as CFString
+        if let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any],
+           let domains = dict["SearchDomains"] as? [String] {
+            return domains
+        }
+        return []
+    }()
+
     private func log(_ message: String) {
         let timestamp = dateFormatter.string(from: Date())
         let logEntry = "[\(timestamp)] \(message)"
-        logEntries.append(logEntry)
+        logQueue.sync {
+            logEntries.append(logEntry)
+        }
         print(logEntry)
     }
     
     func setProgressHandler(_ handler: @escaping (Double, String) -> Void) {
         self.progressHandler = handler
+        let tracker = PhaseProgressTracker()
+        tracker.handler = { [weak self] progress, message in
+            self?.updateProgress(progress, message)
+        }
+        self.phaseTracker = tracker
+    }
+
+    private func getTestHosts() -> [String] {
+        if let saved = UserDefaults.standard.string(forKey: "customTestHosts") {
+            let hosts = saved.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            if !hosts.isEmpty { return hosts }
+        }
+        return ["apple.com", "mail.google.com", "1.1.1.1", "8.8.8.8"]
+    }
+
+    private func isIPAddress(_ host: String) -> Bool {
+        var sin = sockaddr_in()
+        var sin6 = sockaddr_in6()
+        return host.withCString { cStr in
+            inet_pton(AF_INET, cStr, &sin.sin_addr) == 1 ||
+            inet_pton(AF_INET6, cStr, &sin6.sin6_addr) == 1
+        }
     }
     
     func cancel() {
@@ -170,23 +329,42 @@ class WiFiDiagnosticsCollector {
     
     private func updateProgress(_ progress: Double, _ message: String) {
         guard !isCancelled else { return }
+        let shouldUpdate: Bool = progressQueue.sync {
+            guard progress >= currentProgress else { return false }
+            currentProgress = progress
+            return true
+        }
+        guard shouldUpdate else { return }
         log("Progress: \(Int(progress * 100))% - \(message)")
-        // The handler will dispatch to main if needed
         progressHandler?(progress, message)
     }
     
     func generateReport(completion: @escaping (String) -> Void) {
-        logEntries.removeAll()
+        logQueue.sync { logEntries.removeAll() }
         isCancelled = false
+        progressQueue.sync { currentProgress = 0.0 }
         log("Starting WiFi diagnostics collection...")
         updateProgress(0.1, "Initializing diagnostics...")
-        
+
         var report = "=== WiFi Diagnostics Report ===\n"
         report += "Generated: \(Date())\n\n"
-        
+
+        // System info header (fast, no I/O contention)
+        report += generateSystemInfoHeader()
+
         let group = DispatchGroup()
-        var sections: [String] = ["", "", "", ""]
-        
+        var wifiSection = ""
+        var networkSection = ""
+        var connectionsSection = ""
+        var dnsSection = ""
+        var pingSection = ""
+        var dhcpSection = ""
+        var captivePortalSection = ""
+        var mdnsSection = ""
+
+        let testHosts = getTestHosts()
+        let hostCount = testHosts.count
+
         // WiFi Information (with timeout)
         group.enter()
         DispatchQueue.global(qos: .userInitiated).async {
@@ -194,13 +372,12 @@ class WiFiDiagnosticsCollector {
                 group.leave()
                 return
             }
-            self.updateProgress(0.2, "Collecting WiFi information...")
-            let wifiInfo = self.generateWiFiInfo()
-            sections[0] = wifiInfo
-            self.updateProgress(0.3, "WiFi information collected")
+            self.phaseTracker?.update(phase: .wifiInfo, progress: 0.0, detail: "Starting system profiler...")
+            wifiSection = self.generateWiFiInfo()
+            self.phaseTracker?.update(phase: .wifiInfo, progress: 1.0, detail: "Complete")
             group.leave()
         }
-        
+
         // Network Interfaces
         group.enter()
         DispatchQueue.global(qos: .userInitiated).async {
@@ -208,13 +385,12 @@ class WiFiDiagnosticsCollector {
                 group.leave()
                 return
             }
-            self.updateProgress(0.4, "Scanning network interfaces...")
-            let networkInfo = self.generateNetworkInterfaceInfo()
-            sections[1] = "\n" + networkInfo
-            self.updateProgress(0.5, "Network interfaces scanned")
+            self.phaseTracker?.update(phase: .networkInterfaces, progress: 0.0, detail: "Scanning...")
+            networkSection = "\n" + self.generateNetworkInterfaceInfo()
+            self.phaseTracker?.update(phase: .networkInterfaces, progress: 1.0, detail: "Complete")
             group.leave()
         }
-        
+
         // Active Connections
         group.enter()
         DispatchQueue.global(qos: .userInitiated).async {
@@ -222,13 +398,12 @@ class WiFiDiagnosticsCollector {
                 group.leave()
                 return
             }
-            self.updateProgress(0.6, "Analyzing active connections...")
-            let connectionsInfo = self.generateActiveConnectionsInfo()
-            sections[2] = "\n" + connectionsInfo
-            self.updateProgress(0.7, "Active connections analyzed")
+            self.phaseTracker?.update(phase: .activeConnections, progress: 0.0, detail: "Analyzing...")
+            connectionsSection = "\n" + self.generateActiveConnectionsInfo()
+            self.phaseTracker?.update(phase: .activeConnections, progress: 1.0, detail: "Complete")
             group.leave()
         }
-        
+
         // DNS Information
         group.enter()
         DispatchQueue.global(qos: .userInitiated).async {
@@ -236,17 +411,84 @@ class WiFiDiagnosticsCollector {
                 group.leave()
                 return
             }
-            self.updateProgress(0.8, "Testing DNS configuration...")
-            let dnsInfo = self.generateDNSInfo()
-            sections.append("\n" + dnsInfo)
-            self.updateProgress(0.9, "DNS tests completed")
+            self.phaseTracker?.update(phase: .dnsTests, progress: 0.0, detail: "Starting DNS tests...")
+            dnsSection = "\n" + self.generateDNSInfo(testHosts: testHosts)
+            self.phaseTracker?.update(phase: .dnsTests, progress: 1.0, detail: "Complete")
             group.leave()
         }
-        
-        // Wait with timeout (increased to accommodate WiFi scan)
-        let timeout = DispatchTime.now() + .seconds(20)
+
+        // Gateway Ping / Latency Test
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard !self.isCancelled else {
+                group.leave()
+                return
+            }
+            self.phaseTracker?.update(phase: .pingTests, progress: 0.0, detail: "Starting ping tests...")
+            var section = "\n--- Gateway Ping / Latency Test ---\n"
+            var pingTargets: [String] = []
+            if let gateway = self.getDefaultGateway() {
+                section += "\nPing to gateway (\(gateway)):\n"
+                section += self.performPingTest(host: gateway, count: self.pingCount)
+                pingTargets.append(gateway)
+            } else {
+                section += "No default gateway found\n"
+            }
+            for (index, host) in testHosts.enumerated() {
+                guard !self.isCancelled else { break }
+                self.phaseTracker?.update(phase: .pingTests, progress: Double(index) / Double(testHosts.count + 1), detail: "Pinging \(host) (\(index + 1)/\(testHosts.count))...")
+                section += "\nPing to \(host):\n"
+                section += self.performPingTest(host: host, count: self.pingCount)
+            }
+            pingSection = section
+            self.phaseTracker?.update(phase: .pingTests, progress: 1.0, detail: "Complete")
+            group.leave()
+        }
+
+        // DHCP Lease Information
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard !self.isCancelled else {
+                group.leave()
+                return
+            }
+            self.phaseTracker?.update(phase: .dhcpLease, progress: 0.0, detail: "Collecting...")
+            dhcpSection = "\n" + self.getDHCPLeaseInfo()
+            self.phaseTracker?.update(phase: .dhcpLease, progress: 1.0, detail: "Complete")
+            group.leave()
+        }
+
+        // Captive Portal Detection
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard !self.isCancelled else {
+                group.leave()
+                return
+            }
+            self.phaseTracker?.update(phase: .captivePortal, progress: 0.0, detail: "Checking...")
+            captivePortalSection = "\n" + self.performCaptivePortalTest()
+            self.phaseTracker?.update(phase: .captivePortal, progress: 1.0, detail: "Complete")
+            group.leave()
+        }
+
+        // mDNS/Bonjour Service Discovery
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard !self.isCancelled else {
+                group.leave()
+                return
+            }
+            self.phaseTracker?.update(phase: .mdns, progress: 0.0, detail: "Discovering services...")
+            mdnsSection = "\n" + self.performMDNSCheck()
+            self.phaseTracker?.update(phase: .mdns, progress: 1.0, detail: "Complete")
+            group.leave()
+        }
+
+        // Wait with timeout (scaled to number of hosts)
+        let timeoutSeconds = max(30, hostCount * 15 + 15)
+        let timeout = DispatchTime.now() + .seconds(timeoutSeconds)
         let result = group.wait(timeout: timeout)
-        
+
         if self.isCancelled {
             log("Report generation cancelled")
             DispatchQueue.main.async {
@@ -254,34 +496,34 @@ class WiFiDiagnosticsCollector {
             }
             return
         }
-        
+
         if result == .timedOut {
-            log("WARNING: Some operations timed out after 20 seconds")
+            log("WARNING: Some operations timed out after \(timeoutSeconds) seconds")
             report += "\n⚠️ Warning: Some operations timed out\n\n"
         }
-        
-        // Combine sections
-        report += sections.joined()
-        
+
+        // Combine sections (safe - all concurrent work is done after group.wait)
+        report += [wifiSection, networkSection, connectionsSection, dnsSection, pingSection, dhcpSection, captivePortalSection, mdnsSection].joined()
+
         // Add security information (non-sandboxed)
         if !self.isCancelled {
-            self.updateProgress(0.92, "Checking firewall and security settings...")
+            phaseTracker?.update(phase: .security, progress: 0.0, detail: "Checking firewall...")
             report += "\n" + self.generateSecurityInfo()
+            phaseTracker?.update(phase: .security, progress: 1.0, detail: "Complete")
         }
-        
-        // Add debug log
-        report += "\n\n--- Debug Log ---\n"
-        report += logEntries.joined(separator: "\n")
-        
+
         log("Diagnostics collection completed")
-        updateProgress(0.95, "Finalizing report...")
-        
+        phaseTracker?.update(phase: .finalizing, progress: 0.5, detail: "Writing report...")
         log("Report size: \(report.count) characters")
-        log("Calling completion handler...")
-        
+        phaseTracker?.update(phase: .finalizing, progress: 1.0, detail: "Complete")
+        phaseTracker?.complete()
+
+        // Add debug log as the very last step so it captures all entries
+        report += "\n\n--- Debug Log ---\n"
+        report += logQueue.sync { logEntries.joined(separator: "\n") }
+
         // Call completion directly - we're already on a background queue
         completion(report)
-        log("Completion handler called")
     }
     
     private func generateWiFiInfo() -> String {
@@ -366,11 +608,7 @@ class WiFiDiagnosticsCollector {
         
         info += "Interface: \(interface.interfaceName ?? "Unknown")\n"
         info += "Power: \(interface.powerOn() ? "On" : "Off")\n"
-        
-        // Debug: log all available information
-        log("Interface service active: \(interface.serviceActive())")
-        log("Interface security: \(interface.security())")
-        
+
         // Get SSID
         let ssid = interface.ssid()
         if let ssid = ssid {
@@ -415,11 +653,11 @@ class WiFiDiagnosticsCollector {
         let noise = interface.noiseMeasurement()
         
         if rssi != 0 || noise != 0 {
-            info += "RSSI: \(rssi) dBm\n"
+            info += "RSSI: \(rssi) dBm (\(rssiQualityLabel(rssi)))\n"
             info += "Noise: \(noise) dBm\n"
-            
+
             let snr = rssi - noise
-            info += "SNR: \(snr) dB\n"
+            info += "SNR: \(snr) dB (\(snrQualityLabel(snr)))\n"
             
             if let channel = interface.wlanChannel() {
                 info += "Channel: \(channel.channelNumber)\n"
@@ -556,6 +794,36 @@ class WiFiDiagnosticsCollector {
                     }
                     
                     info += "\n  Total networks found: \(networks.count)\n"
+
+                    // Channel Utilization Analysis
+                    info += "\n--- Channel Utilization Analysis ---\n"
+                    var channelCounts: [Int: Int] = [:]
+                    for network in networks {
+                        if let ch = network.wlanChannel?.channelNumber {
+                            channelCounts[ch, default: 0] += 1
+                        }
+                    }
+                    // Get current channel
+                    let currentChannel = interface.wlanChannel()?.channelNumber
+                    // Sort by count descending
+                    let sorted = channelCounts.sorted { $0.value > $1.value }
+                    for (ch, count) in sorted {
+                        let marker = (currentChannel != nil && ch == currentChannel) ? " <-- your channel" : ""
+                        info += "  Channel \(ch): \(count) network\(count == 1 ? "" : "s")\(marker)\n"
+                    }
+                    // Recommendation
+                    if let curCh = currentChannel, let curCount = channelCounts[curCh], curCount > 1 {
+                        // Find least congested channel in same band
+                        let curBand = interface.wlanChannel()?.channelBand
+                        let sameBandChannels = channelCounts.filter { ch, _ in
+                            if curBand == .band2GHz { return ch <= 14 }
+                            if curBand == .band5GHz { return ch > 14 && ch <= 177 }
+                            return ch > 177
+                        }
+                        if let best = sameBandChannels.min(by: { $0.value < $1.value }), best.value < curCount {
+                            info += "  Recommendation: Channel \(curCh) has \(curCount) competing networks. Channel \(best.key) has only \(best.value).\n"
+                        }
+                    }
                 }
             } else {
                 log("Network scan completed but no results or error")
@@ -661,49 +929,6 @@ class WiFiDiagnosticsCollector {
         return info
     }
     
-    private func getActiveConnectionsNative() -> String {
-        var info = ""
-        
-        // Get TCP/UDP statistics using sysctl
-        var tcpStats = ""
-        var len: size_t = 0
-        
-        // Try to get connection info through sysctl (sandbox-safe)
-        if sysctlbyname("net.inet.tcp.pcblist", nil, &len, nil, 0) == 0 && len > 0 {
-            var buf = [UInt8](repeating: 0, count: len)
-            if sysctlbyname("net.inet.tcp.pcblist", &buf, &len, nil, 0) == 0 {
-                // Parse the data (complex structure, simplified here)
-                tcpStats = "TCP connections retrieved (parsing limited in sandbox)\n"
-            }
-        }
-        
-        // Get basic network statistics
-        info += "Network Statistics:\n"
-        info += tcpStats
-        
-        // Use SCDynamicStore to get some connection info
-        if let store = SCDynamicStoreCreate(nil, "WiFiDiagnostics" as CFString, nil, nil) {
-            let keys = ["State:/Network/Global/IPv4", "State:/Network/Global/IPv6"] as [CFString]
-            
-            if let dict = SCDynamicStoreCopyMultiple(store, nil, keys as CFArray) as? [String: Any] {
-                for (key, value) in dict {
-                    info += "\n\(key):\n"
-                    if let valueDict = value as? [String: Any] {
-                        for (k, v) in valueDict {
-                            info += "  \(k): \(v)\n"
-                        }
-                    }
-                }
-            }
-        }
-        
-        if info.isEmpty {
-            info = "Limited information available in sandbox\n"
-        }
-        
-        return info
-    }
-    
     private func getRoutingTableInfo() -> String {
         var info = ""
         
@@ -719,22 +944,8 @@ class WiFiDiagnosticsCollector {
                 // Parse routing messages
                 info += parseRoutingTable(buf, length: len)
                 
-                // Try to get default gateway from SCDynamicStore instead
-                if let store = SCDynamicStoreCreate(nil, "WiFiDiagnostics" as CFString, nil, nil) {
-                    let key = "State:/Network/Global/IPv4" as CFString
-                    
-                    if let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any],
-                       let router = dict["Router"] as? String {
-                        info += "Default Gateway: \(router)\n"
-                    }
-                }
-                
-                // Get DNS servers
-                let dnsKey = "State:/Network/Global/DNS" as CFString
-                if let store = SCDynamicStoreCreate(nil, "WiFiDiagnostics" as CFString, nil, nil),
-                   let dnsDict = SCDynamicStoreCopyValue(store, dnsKey) as? [String: Any],
-                   let servers = dnsDict["ServerAddresses"] as? [String] {
-                    info += "DNS Servers: \(servers.joined(separator: ", "))\n"
+                if let gateway = cachedGateway {
+                    info += "Default Gateway: \(gateway)\n"
                 }
             }
         }
@@ -757,10 +968,10 @@ class WiFiDiagnosticsCollector {
     
     private func getIPv4ConfigForInterface(_ interface: String) -> String? {
         var info = ""
-        
-        if let store = SCDynamicStoreCreate(nil, "WiFiDiagnostics" as CFString, nil, nil) {
+
+        if let store = dynamicStore {
             let key = "State:/Network/Service/[^/]+/IPv4" as CFString
-            
+
             if let patterns = SCDynamicStoreCopyKeyList(store, key) as? [String] {
                 for pattern in patterns {
                     if let dict = SCDynamicStoreCopyValue(store, pattern as CFString) as? [String: Any],
@@ -851,58 +1062,62 @@ class WiFiDiagnosticsCollector {
         return tcpOutput + udpOutput
     }
     
-    private func generateDNSInfo() -> String {
+    private func generateDNSInfo(testHosts: [String]) -> String {
         log("Collecting DNS information...")
         var info = "--- DNS Configuration and Tests ---\n"
-        
+
         // Get DNS servers from System Configuration
         info += "\nConfigured DNS Servers:\n"
-        if let store = SCDynamicStoreCreate(nil, "WiFiDiagnostics" as CFString, nil, nil) {
-            let dnsKey = "State:/Network/Global/DNS" as CFString
-            if let dnsDict = SCDynamicStoreCopyValue(store, dnsKey) as? [String: Any] {
-                if let servers = dnsDict["ServerAddresses"] as? [String] {
-                    for server in servers {
-                        info += "  • \(server)\n"
-                    }
-                }
-                if let searchDomains = dnsDict["SearchDomains"] as? [String] {
-                    info += "\nSearch Domains:\n"
-                    for domain in searchDomains {
-                        info += "  • \(domain)\n"
-                    }
-                }
+        let servers = cachedDNSServers
+        if servers.isEmpty {
+            info += "  No DNS servers configured\n"
+        } else {
+            for server in servers {
+                info += "  • \(server)\n"
             }
         }
-        
+        let searchDomains = cachedDNSSearchDomains
+        if !searchDomains.isEmpty {
+            info += "\nSearch Domains:\n"
+            for domain in searchDomains {
+                info += "  • \(domain)\n"
+            }
+        }
+
+        // Total steps: resolve(N) + reachability(N) + TCP(N) + HTTPS(hostnamesOnly) + externalIP
+        let hostnameHosts = testHosts.filter { !isIPAddress($0) }
+        let totalSteps = Double(testHosts.count * 3 + hostnameHosts.count + 1)
+        var step = 0.0
+
         // Perform DNS lookups using multiple methods
         info += "\n--- DNS Resolution Tests ---\n"
-        
-        // Test domains
-        let testDomains = ["apple.com", "google.com", "cloudflare.com", "mail.google.com"]
-        
-        for domain in testDomains {
-            info += "\nResolving \(domain):\n"
-            
+
+        for (index, host) in testHosts.enumerated() {
+            guard !isCancelled else { break }
+            phaseTracker?.update(phase: .dnsTests, progress: step / totalSteps, detail: "Resolving \(host) (\(index + 1)/\(testHosts.count))...")
+            info += "\nResolving \(host):\n"
+
             // Method 1: Using CFHost (sandbox-friendly)
-            if let results = self.performCFHostLookup(hostname: domain) {
+            if let results = self.performCFHostLookup(hostname: host) {
                 info += "  CFHost lookup:\n"
                 for ip in results {
                     info += "    • \(ip)\n"
                 }
             }
-            
+
             // Method 2: Using getaddrinfo (POSIX, sandbox-friendly)
-            if let results = self.performGetAddrInfoLookup(hostname: domain) {
+            if let results = self.performGetAddrInfoLookup(hostname: host) {
                 info += "  getaddrinfo lookup:\n"
                 for ip in results {
                     info += "    • \(ip)\n"
                 }
             }
-            
-            // Method 3: Using dnssd (DNS Service Discovery)
-            info += self.performDNSSDLookup(hostname: domain)
+
+            // Method 3: Using dscacheutil (cache lookup)
+            info += self.performDSCacheUtilLookup(hostname: host)
+            step += 1
         }
-        
+
         // Test reverse DNS
         info += "\n--- Reverse DNS Tests ---\n"
         if let gateway = self.getDefaultGateway() {
@@ -913,40 +1128,50 @@ class WiFiDiagnosticsCollector {
                 info += "  • No reverse DNS record\n"
             }
         }
-        
-        // SCNetworkReachability tests
-        // Note: SCNetworkReachability is deprecated in macOS 14.4+ but remains the best option
-        // for simple one-time reachability checks. NWPathMonitor is designed for monitoring
-        // changes over time, not single checks.
+
+        // Network path reachability tests using NWPathMonitor
         info += "\n\n--- Network Reachability Tests ---\n"
-        
+
         // Test default gateway first
         if let gateway = self.getDefaultGateway() {
             info += "\nReachability for Default Gateway (\(gateway)):\n"
-            info += self.performReachabilityTest(hostname: gateway)
+            info += self.performPathReachabilityTest(hostname: gateway)
         }
-        
-        for domain in testDomains {
-            info += "\nReachability for \(domain):\n"
-            info += self.performReachabilityTest(hostname: domain)
+
+        for (index, host) in testHosts.enumerated() {
+            guard !isCancelled else { break }
+            phaseTracker?.update(phase: .dnsTests, progress: step / totalSteps, detail: "Reachability \(host) (\(index + 1)/\(testHosts.count))...")
+            info += "\nReachability for \(host):\n"
+            info += self.performPathReachabilityTest(hostname: host)
+            step += 1
         }
-        
+
         // NWConnection tests
         info += "\n\n--- Network Connection Tests (TCP) ---\n"
-        for domain in testDomains {
-            info += "\nTCP connection to \(domain):443:\n"
-            info += self.performNWConnectionTest(hostname: domain, port: 443)
+        for (index, host) in testHosts.enumerated() {
+            guard !isCancelled else { break }
+            phaseTracker?.update(phase: .dnsTests, progress: step / totalSteps, detail: "TCP test \(host) (\(index + 1)/\(testHosts.count))...")
+            info += "\nTCP connection to \(host):443:\n"
+            info += self.performNWConnectionTest(hostname: host, port: 443)
+            step += 1
         }
-        
-        // URLSession test for mail.google.com
+
+        // URLSession HTTPS test for all hostname entries (not bare IPs)
         info += "\n\n--- HTTPS Connectivity Test ---\n"
-        info += "Testing HTTPS connection to mail.google.com:\n"
-        info += self.performURLSessionTest(url: "https://mail.google.com")
-        
+        for (index, host) in hostnameHosts.enumerated() {
+            guard !isCancelled else { break }
+            phaseTracker?.update(phase: .dnsTests, progress: step / totalSteps, detail: "HTTPS test \(host) (\(index + 1)/\(hostnameHosts.count))...")
+            info += "Testing HTTPS connection to \(host):\n"
+            info += self.performURLSessionTest(url: "https://\(host)")
+            info += "\n"
+            step += 1
+        }
+
         // External IP detection
-        info += "\n\n--- External IP Address ---\n"
+        phaseTracker?.update(phase: .dnsTests, progress: step / totalSteps, detail: "Detecting external IP...")
+        info += "\n--- External IP Address ---\n"
         info += self.getExternalIPAddress()
-        
+
         log("DNS information collection completed")
         return info
     }
@@ -1015,8 +1240,8 @@ class WiFiDiagnosticsCollector {
         return results.isEmpty ? nil : results
     }
     
-    private func performDNSSDLookup(hostname: String) -> String {
-        var info = "  DNS-SD lookup:\n"
+    private func performDSCacheUtilLookup(hostname: String) -> String {
+        var info = "  dscacheutil (cache) lookup:\n"
         
         // This is a simplified version - full DNS-SD would require callbacks
         let task = Process()
@@ -1047,35 +1272,52 @@ class WiFiDiagnosticsCollector {
     }
     
     private func performReverseDNS(ipAddress: String) -> String? {
-        guard let data = ipAddress.data(using: .utf8) else { return nil }
-        
-        let host = CFHostCreateWithAddress(nil, data as CFData).takeRetainedValue()
+        let addressData: Data
+        if ipAddress.contains(":") {
+            // IPv6
+            var sin6 = sockaddr_in6()
+            sin6.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
+            sin6.sin6_family = sa_family_t(AF_INET6)
+            guard inet_pton(AF_INET6, ipAddress, &sin6.sin6_addr) == 1 else { return nil }
+            addressData = Data(bytes: &sin6, count: MemoryLayout<sockaddr_in6>.size)
+        } else {
+            // IPv4
+            var sin = sockaddr_in()
+            sin.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+            sin.sin_family = sa_family_t(AF_INET)
+            guard inet_pton(AF_INET, ipAddress, &sin.sin_addr) == 1 else { return nil }
+            addressData = Data(bytes: &sin, count: MemoryLayout<sockaddr_in>.size)
+        }
+
+        let host = CFHostCreateWithAddress(nil, addressData as CFData).takeRetainedValue()
         var resolved = DarwinBoolean(false)
-        
-        // CFHost operations run on their own internal thread pool
-        // This may cause priority inversion warnings but is unavoidable with this API
+
         CFHostStartInfoResolution(host, .names, nil)
-        
+
         guard let names = CFHostGetNames(host, &resolved)?.takeUnretainedValue() as? [String],
               resolved.boolValue,
               !names.isEmpty else {
             return nil
         }
-        
+
         return names.first
     }
     
     private func getDefaultGateway() -> String? {
-        if let store = SCDynamicStoreCreate(nil, "WiFiDiagnostics" as CFString, nil, nil) {
-            let key = "State:/Network/Global/IPv4" as CFString
-            if let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any],
-               let router = dict["Router"] as? String {
-                return router
-            }
-        }
-        return nil
+        return cachedGateway
     }
     
+    private func hexToMAC(_ hexString: String) -> String {
+        var mac = ""
+        for i in stride(from: 0, to: hexString.count, by: 2) {
+            if !mac.isEmpty { mac += ":" }
+            let startIndex = hexString.index(hexString.startIndex, offsetBy: i)
+            let endIndex = hexString.index(startIndex, offsetBy: 2)
+            mac += String(hexString[startIndex..<endIndex])
+        }
+        return mac
+    }
+
     private func getBSSIDUsingAlternativeMethods() -> String? {
         // Try multiple alternative methods to get BSSID on macOS when CoreWLAN fails
         
@@ -1103,15 +1345,7 @@ class WiFiDiagnosticsCollector {
                            dataStart.lowerBound < dataEnd.upperBound {
                             let hexData = String(line[dataStart.upperBound..<dataEnd.lowerBound])
                                 .replacingOccurrences(of: " ", with: "")
-                            
-                            // Convert hex string to MAC address format
-                            var bssid = ""
-                            for i in stride(from: 0, to: hexData.count, by: 2) {
-                                if !bssid.isEmpty { bssid += ":" }
-                                let startIndex = hexData.index(hexData.startIndex, offsetBy: i)
-                                let endIndex = hexData.index(startIndex, offsetBy: 2)
-                                bssid += String(hexData[startIndex..<endIndex])
-                            }
+                            let bssid = hexToMAC(hexData)
                             log("BSSID from ioreg: \(bssid)")
                             return bssid.lowercased()
                         }
@@ -1144,14 +1378,7 @@ class WiFiDiagnosticsCollector {
                            dataStart.lowerBound < dataEnd.upperBound {
                             let hexData = String(line[dataStart.upperBound..<dataEnd.lowerBound])
                                 .replacingOccurrences(of: " ", with: "")
-                            
-                            var bssid = ""
-                            for i in stride(from: 0, to: hexData.count, by: 2) {
-                                if !bssid.isEmpty { bssid += ":" }
-                                let startIndex = hexData.index(hexData.startIndex, offsetBy: i)
-                                let endIndex = hexData.index(startIndex, offsetBy: 2)
-                                bssid += String(hexData[startIndex..<endIndex])
-                            }
+                            let bssid = hexToMAC(hexData)
                             log("BSSID from alternative ioreg: \(bssid)")
                             return bssid.lowercased()
                         }
@@ -1354,42 +1581,6 @@ class WiFiDiagnosticsCollector {
         return info.isEmpty ? "No additional details found\n" : info
     }
     
-    private func formatChannelsByBand(_ channelString: String) -> String {
-        var formatted = ""
-        var band2_4GHz: [String] = []
-        var band5GHz: [String] = []
-        var band6GHz: [String] = []
-        
-        // Parse channel numbers from the string
-        let components = channelString.split(separator: ",")
-        for component in components {
-            let trimmed = component.trimmingCharacters(in: .whitespaces)
-            if let channel = Int(trimmed) {
-                // Classify channels by frequency band
-                if channel <= 14 {
-                    band2_4GHz.append(trimmed)
-                } else if channel <= 177 {
-                    band5GHz.append(trimmed)
-                } else {
-                    band6GHz.append(trimmed)
-                }
-            }
-        }
-        
-        // Simple format - just list the channels
-        if !band2_4GHz.isEmpty {
-            formatted += "    2.4 GHz: " + band2_4GHz.joined(separator: ", ") + "\n"
-        }
-        if !band5GHz.isEmpty {
-            formatted += "    5 GHz: " + band5GHz.joined(separator: ", ") + "\n"
-        }
-        if !band6GHz.isEmpty {
-            formatted += "    6 GHz: " + band6GHz.joined(separator: ", ") + "\n"
-        }
-        
-        return formatted
-    }
-    
     private func formatChannelsWithBandInfo(_ channelData: String) -> String {
         var formatted = ""
         var band2_4GHz: [String] = []
@@ -1471,40 +1662,358 @@ class WiFiDiagnosticsCollector {
         }
     }
     
+    // MARK: - mDNS/Bonjour Service Discovery
+
+    private func performMDNSCheck() -> String {
+        var info = "--- mDNS/Bonjour Service Discovery ---\n"
+
+        let task = Process()
+        task.launchPath = "/usr/bin/dns-sd"
+        task.arguments = ["-B", "_services._dns-sd._udp", "local."]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = pipe
+
+        do {
+            try task.run()
+            // dns-sd runs forever; kill after 3 seconds
+            let completed = task.waitUntilExit(timeout: 3.0)
+            if !completed {
+                task.terminate()
+            }
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8), !output.isEmpty {
+                let lines = output.components(separatedBy: .newlines)
+                var services: [String] = []
+                for line in lines {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    // Lines with service types look like: "... _airplay._tcp. ..."
+                    if trimmed.contains("._tcp.") || trimmed.contains("._udp.") {
+                        // Extract service type (last column usually)
+                        let components = trimmed.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+                        if let serviceName = components.last, serviceName.contains("._") {
+                            if !services.contains(serviceName) {
+                                services.append(serviceName)
+                            }
+                        }
+                    }
+                }
+
+                if services.isEmpty {
+                    info += "  No mDNS services found\n"
+                } else {
+                    info += "  Found \(services.count) service type\(services.count == 1 ? "" : "s"):\n"
+                    for service in services.sorted() {
+                        info += "    \(service)\n"
+                    }
+                }
+            } else {
+                info += "  No mDNS response received\n"
+            }
+        } catch {
+            info += "  mDNS discovery failed: \(error.localizedDescription)\n"
+        }
+
+        return info
+    }
+
+    // MARK: - Signal Quality Labels
+
+    private func rssiQualityLabel(_ rssi: Int) -> String {
+        switch rssi {
+        case _ where rssi > -50: return "Excellent"
+        case -67 ... -50: return "Good"
+        case -70 ... -68: return "Fair"
+        case -80 ... -71: return "Weak"
+        default: return "Very Weak"
+        }
+    }
+
+    private func snrQualityLabel(_ snr: Int) -> String {
+        switch snr {
+        case _ where snr > 40: return "Excellent"
+        case 25...40: return "Good"
+        case 15...24: return "Fair"
+        default: return "Poor"
+        }
+    }
+
+    // MARK: - System Information Header
+
+    private func generateSystemInfoHeader() -> String {
+        var info = "--- System Information ---\n"
+
+        // macOS version
+        info += "macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
+
+        // Hardware model
+        var modelSize: size_t = 0
+        if sysctlbyname("hw.model", nil, &modelSize, nil, 0) == 0 {
+            var model = [CChar](repeating: 0, count: modelSize)
+            if sysctlbyname("hw.model", &model, &modelSize, nil, 0) == 0 {
+                info += "Hardware Model: \(String(cString: model))\n"
+            }
+        }
+
+        // Chip / CPU brand
+        var cpuSize: size_t = 0
+        if sysctlbyname("machdep.cpu.brand_string", nil, &cpuSize, nil, 0) == 0 {
+            var cpu = [CChar](repeating: 0, count: cpuSize)
+            if sysctlbyname("machdep.cpu.brand_string", &cpu, &cpuSize, nil, 0) == 0 {
+                info += "Chip: \(String(cString: cpu))\n"
+            }
+        } else {
+            // Apple Silicon doesn't expose brand_string; check for arm64
+            var archSize: size_t = 0
+            if sysctlbyname("hw.machine", nil, &archSize, nil, 0) == 0 {
+                var arch = [CChar](repeating: 0, count: archSize)
+                if sysctlbyname("hw.machine", &arch, &archSize, nil, 0) == 0 {
+                    info += "Architecture: \(String(cString: arch)) (Apple Silicon)\n"
+                }
+            }
+        }
+
+        // Hostname
+        info += "Hostname: \(Host.current().localizedName ?? ProcessInfo.processInfo.hostName)\n"
+
+        // System uptime
+        let uptime = ProcessInfo.processInfo.systemUptime
+        let days = Int(uptime) / 86400
+        let hours = (Int(uptime) % 86400) / 3600
+        let minutes = (Int(uptime) % 3600) / 60
+        if days > 0 {
+            info += "Uptime: \(days)d \(hours)h \(minutes)m\n"
+        } else {
+            info += "Uptime: \(hours)h \(minutes)m\n"
+        }
+
+        info += "\n"
+        return info
+    }
+
+    // MARK: - Gateway Ping / Latency Test
+
+    private func performPingTest(host: String, count: Int) -> String {
+        var info = ""
+
+        let task = Process()
+        task.launchPath = "/sbin/ping"
+        task.arguments = ["-c", "\(count)", "-W", "2000", host]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = pipe
+
+        do {
+            try task.run()
+            let completed = task.waitUntilExit(timeout: TimeInterval(count * 3 + 5))
+
+            if completed {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let output = String(data: data, encoding: .utf8) {
+                    let lines = output.components(separatedBy: .newlines)
+                    for line in lines {
+                        let trimmed = line.trimmingCharacters(in: .whitespaces)
+                        if trimmed.contains("packet loss") || trimmed.contains("round-trip") || trimmed.contains("packets transmitted") {
+                            info += "  \(trimmed)\n"
+                        }
+                    }
+                    if info.isEmpty {
+                        info = "  \(output)\n"
+                    }
+                }
+            } else {
+                task.terminate()
+                info += "  Ping timed out\n"
+            }
+        } catch {
+            info += "  Ping failed: \(error.localizedDescription)\n"
+        }
+
+        return info
+    }
+
+    // MARK: - DHCP Lease Information
+
+    private func getDHCPLeaseInfo() -> String {
+        var info = "--- DHCP Lease Information ---\n"
+
+        let task = Process()
+        task.launchPath = "/usr/sbin/ipconfig"
+        task.arguments = ["getpacket", "en0"]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = pipe
+
+        do {
+            try task.run()
+            let completed = task.waitUntilExit(timeout: 5.0)
+
+            if completed {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let output = String(data: data, encoding: .utf8), !output.isEmpty {
+                    let lines = output.components(separatedBy: .newlines)
+                    for line in lines {
+                        let trimmed = line.trimmingCharacters(in: .whitespaces)
+                        if trimmed.contains("server_identifier") ||
+                           trimmed.contains("lease_time") ||
+                           trimmed.contains("yiaddr") ||
+                           trimmed.contains("subnet_mask") ||
+                           trimmed.contains("router") ||
+                           trimmed.contains("domain_name_server") ||
+                           trimmed.contains("domain_name") {
+                            info += "  \(trimmed)\n"
+                        }
+                    }
+                    if info == "--- DHCP Lease Information ---\n" {
+                        // No recognized fields found, include raw output
+                        info += output
+                    }
+                } else {
+                    info += "  No DHCP lease data available (interface may use static IP)\n"
+                }
+            } else {
+                task.terminate()
+                info += "  ipconfig timed out\n"
+            }
+        } catch {
+            info += "  Failed to retrieve DHCP info: \(error.localizedDescription)\n"
+        }
+
+        return info
+    }
+
+    // MARK: - Captive Portal Detection
+
+    private func performCaptivePortalTest() -> String {
+        var info = "--- Captive Portal Detection ---\n"
+        let semaphore = DispatchSemaphore(value: 0)
+        var resultInfo = ""
+
+        guard let url = URL(string: "http://captive.apple.com/hotspot-detect.html") else {
+            return info + "  Failed to create test URL\n"
+        }
+
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 5.0
+        config.timeoutIntervalForResource = 5.0
+        // Prevent automatic redirect following so we can detect captive portals
+        let session = URLSession(configuration: config)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        let task = session.dataTask(with: request) { data, response, error in
+            if let error = error {
+                resultInfo = "  Test failed: \(error.localizedDescription)\n"
+                resultInfo += "  Status: Unable to determine (no connectivity?)\n"
+            } else if let httpResponse = response as? HTTPURLResponse,
+                      let data = data,
+                      let body = String(data: data, encoding: .utf8) {
+                if httpResponse.statusCode == 200 && body.contains("<TITLE>Success</TITLE>") {
+                    resultInfo = "  Status: No captive portal detected (direct internet access)\n"
+                } else if httpResponse.statusCode >= 300 && httpResponse.statusCode < 400 {
+                    resultInfo = "  Status: Captive portal DETECTED (redirect to login page)\n"
+                    if let location = httpResponse.value(forHTTPHeaderField: "Location") {
+                        resultInfo += "  Redirect URL: \(location)\n"
+                    }
+                } else {
+                    resultInfo = "  Status: Possible captive portal (unexpected response)\n"
+                    resultInfo += "  HTTP Status: \(httpResponse.statusCode)\n"
+                }
+            }
+            semaphore.signal()
+        }
+
+        task.resume()
+
+        if semaphore.wait(timeout: .now() + .seconds(10)) == .timedOut {
+            task.cancel()
+            resultInfo = "  Test timed out (possible network issue or captive portal blocking)\n"
+        }
+
+        session.invalidateAndCancel()
+        info += resultInfo
+        return info
+    }
+
     // MARK: - Network Connectivity Tests
     
-    @available(macOS, deprecated: 14.4, message: "SCNetworkReachability is deprecated but still functional")
-    private func performReachabilityTest(hostname: String) -> String {
+    private func performPathReachabilityTest(hostname: String) -> String {
         var info = ""
-        
-        guard let reachability = SCNetworkReachabilityCreateWithName(nil, hostname) else {
-            return "  Failed to create reachability reference\n"
+        let semaphore = DispatchSemaphore(value: 0)
+        var pathStatus: NWPath.Status?
+        var pathInterfaces: [NWInterface] = []
+        var isExpensive = false
+        var isConstrained = false
+        var supportsDNS = false
+
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { path in
+            pathStatus = path.status
+            pathInterfaces = path.availableInterfaces
+            isExpensive = path.isExpensive
+            isConstrained = path.isConstrained
+            supportsDNS = path.supportsDNS
+            semaphore.signal()
         }
-        
-        var flags: SCNetworkReachabilityFlags = []
-        guard SCNetworkReachabilityGetFlags(reachability, &flags) else {
-            return "  Failed to get reachability flags\n"
+
+        let queue = DispatchQueue(label: "reachability.\(hostname)")
+        monitor.start(queue: queue)
+
+        let result = semaphore.wait(timeout: .now() + 5)
+        monitor.cancel()
+
+        if result == .timedOut {
+            return "  Reachability check timed out\n"
         }
-        
-        info += "  Reachable: \(flags.contains(.reachable) ? "Yes" : "No")\n"
-        info += "  Connection Required: \(flags.contains(.connectionRequired) ? "Yes" : "No")\n"
-        
-        if flags.contains(.reachable) {
-            info += "  Connection Type: WiFi/Ethernet\n"
-            
-            if flags.contains(.connectionOnDemand) || flags.contains(.connectionOnTraffic) {
-                info += "  On-Demand Connection: Available\n"
+
+        guard let status = pathStatus else {
+            return "  Failed to determine path status\n"
+        }
+
+        switch status {
+        case .satisfied:
+            info += "  Reachable: Yes\n"
+            info += "  Connection Required: No\n"
+        case .unsatisfied:
+            info += "  Reachable: No\n"
+            info += "  Connection Required: Yes\n"
+        case .requiresConnection:
+            info += "  Reachable: No\n"
+            info += "  Connection Required: Yes (on-demand available)\n"
+        @unknown default:
+            info += "  Reachable: Unknown\n"
+        }
+
+        if status == .satisfied {
+            let interfaceTypes = pathInterfaces.map { iface -> String in
+                switch iface.type {
+                case .wifi: return "WiFi"
+                case .cellular: return "Cellular"
+                case .wiredEthernet: return "Ethernet"
+                case .loopback: return "Loopback"
+                default: return "Other"
+                }
             }
-            
-            if flags.contains(.interventionRequired) {
-                info += "  Intervention Required: Yes\n"
+            if !interfaceTypes.isEmpty {
+                info += "  Connection Type: \(interfaceTypes.joined(separator: ", "))\n"
             }
-            
-            if flags.contains(.isDirect) {
-                info += "  Direct Connection: Yes\n"
+            if supportsDNS {
+                info += "  DNS Support: Yes\n"
             }
         }
-        
+
+        if isExpensive {
+            info += "  Expensive Path: Yes\n"
+        }
+        if isConstrained {
+            info += "  Constrained Path: Yes\n"
+        }
+
         return info
     }
     
@@ -2105,8 +2614,8 @@ extension WiFiDiagnosticsCollector {
     
     private func getProxySettings() -> String {
         var info = ""
-        
-        if let store = SCDynamicStoreCreate(nil, "WiFiDiagnostics" as CFString, nil, nil) {
+
+        if let store = dynamicStore {
             let proxiesKey = "State:/Network/Global/Proxies" as CFString
             
             if let proxiesDict = SCDynamicStoreCopyValue(store, proxiesKey) as? [String: Any] {
