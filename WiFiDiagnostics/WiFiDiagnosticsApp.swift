@@ -118,6 +118,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var aboutWindow: NSWindow?
     private var progressWindow: ProgressWindowController?
     private var startupDialogWindow: StartupDialogWindowController?
+    private var hostChecksWindow: HostChecksWindowController?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Check if user has chosen to hide the startup dialog
@@ -207,6 +208,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "About WiFi Diagnostics", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Generate WiFi Diagnostics", action: #selector(generateDiagnostics), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Host Checks...", action: #selector(showHostChecks), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Settings", action: #selector(showSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
@@ -298,20 +300,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try report.write(to: fileURL, atomically: true, encoding: .utf8)
             print("Report saved to: \(fileURL.path)")
-            
+
+            // Reveal the file in Finder
+            NSWorkspace.shared.selectFile(fileURL.path, inFileViewerRootedAtPath: "")
+
             // Show notification
             let content = UNMutableNotificationContent()
             content.title = "WiFi Diagnostics"
             content.body = "Report saved to Downloads folder"
             content.sound = UNNotificationSound.default
-            
+
             let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error = error {
                     print("Failed to show notification: \(error)")
                 }
             }
-            
+
             return fileURL.path
         } catch {
             print("Failed to save report: \(error)")
@@ -328,6 +333,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    private func makeReportScrollView(content: String, frame: NSRect) -> NSScrollView {
+        let textView = NSTextView(frame: NSRect(origin: .zero, size: frame.size))
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        textView.string = content
+        textView.backgroundColor = NSColor.textBackgroundColor
+        textView.textColor = NSColor.labelColor
+        textView.textContainer?.containerSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+        textView.minSize = CGSize(width: 0, height: 0)
+        textView.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+
+        let scrollView = NSScrollView(frame: frame)
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = false
+        scrollView.borderType = .noBorder
+        scrollView.documentView = textView
+        scrollView.autoresizingMask = [.width, .height]
+        return scrollView
+    }
+
     private func showDiagnosticsWindow(with content: String) {
         if diagnosticsWindow == nil {
             diagnosticsWindow = NSWindow(
@@ -339,92 +371,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             diagnosticsWindow?.title = "WiFi Diagnostics Report"
             diagnosticsWindow?.center()
         }
-        
-        // Check if we need to show a permission button
-        let needsLocationPermission = content.contains("⚠️ Location Services Required") || 
+
+        let needsLocationPermission = content.contains("⚠️ Location Services Required") ||
                                      content.contains("⚠️ Network scan requires Location Services")
-        
+
         if needsLocationPermission {
-            // Create a view with text and button
             let containerView = NSView(frame: diagnosticsWindow!.contentView!.bounds)
             containerView.autoresizingMask = [.width, .height]
-            
-            // Add button at the top
-            let button = NSButton(title: "Open Location Services Settings", 
-                                target: self, 
+
+            let button = NSButton(title: "Open Location Services Settings",
+                                target: self,
                                 action: #selector(openLocationSettings))
             button.bezelStyle = .rounded
             button.translatesAutoresizingMaskIntoConstraints = false
             containerView.addSubview(button)
-            
-            // Create the text view
-            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 560))
-            textView.isEditable = false
-            textView.isSelectable = true
-            textView.isRichText = false
-            textView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-            textView.string = content
-            textView.backgroundColor = NSColor.textBackgroundColor
-            textView.textColor = NSColor.labelColor
-            
-            // Configure text container
-            textView.textContainer?.containerSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-            textView.textContainer?.widthTracksTextView = true
-            textView.minSize = CGSize(width: 0, height: 0)
-            textView.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-            textView.isVerticallyResizable = true
-            textView.isHorizontallyResizable = false
-            textView.autoresizingMask = [.width]
-            
-            // Create scroll view
-            let scrollView = NSScrollView(frame: NSRect(x: 0, y: 40, width: 800, height: 560))
-            scrollView.hasVerticalScroller = true
-            scrollView.hasHorizontalScroller = false
-            scrollView.autohidesScrollers = false
-            scrollView.borderType = .noBorder
-            scrollView.documentView = textView
-            scrollView.autoresizingMask = [.width, .height]
+
+            let scrollView = makeReportScrollView(content: content, frame: NSRect(x: 0, y: 40, width: 800, height: 560))
             containerView.addSubview(scrollView)
-            
-            // Add constraints for button
+
             NSLayoutConstraint.activate([
                 button.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
                 button.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 10)
             ])
-            
+
             diagnosticsWindow?.contentView = containerView
         } else {
-            // No permission issues, show regular text view
-            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
-            textView.isEditable = false
-            textView.isSelectable = true
-            textView.isRichText = false
-            textView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-            textView.string = content
-            textView.backgroundColor = NSColor.textBackgroundColor
-            textView.textColor = NSColor.labelColor
-            
-            // Configure text container
-            textView.textContainer?.containerSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-            textView.textContainer?.widthTracksTextView = true
-            textView.minSize = CGSize(width: 0, height: 0)
-            textView.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-            textView.isVerticallyResizable = true
-            textView.isHorizontallyResizable = false
-            textView.autoresizingMask = [.width]
-            
-            // Create scroll view
-            let scrollView = NSScrollView(frame: diagnosticsWindow!.contentView!.bounds)
-            scrollView.hasVerticalScroller = true
-            scrollView.hasHorizontalScroller = false
-            scrollView.autohidesScrollers = false
-            scrollView.borderType = .noBorder
-            scrollView.documentView = textView
-            scrollView.autoresizingMask = [.width, .height]
-            
+            let scrollView = makeReportScrollView(content: content, frame: diagnosticsWindow!.contentView!.bounds)
             diagnosticsWindow?.contentView = scrollView
         }
-        
+
         diagnosticsWindow?.makeKeyAndOrderFront(nil)
         
         NSApp.activate(ignoringOtherApps: true)
@@ -434,6 +409,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LocationPermissionManager.openLocationServicesSettings()
     }
     
+    @objc private func showHostChecks() {
+        if let existingWindow = hostChecksWindow?.window, existingWindow.isVisible {
+            existingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        hostChecksWindow = HostChecksWindowController()
+        hostChecksWindow?.show()
+    }
+
     @objc private func showSettings() {
         // Close any existing startup dialog window
         if let existingWindow = startupDialogWindow?.window {
