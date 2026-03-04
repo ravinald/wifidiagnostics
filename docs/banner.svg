@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="wifi-glow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4fc3f7;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#0288d1;stop-opacity:0.8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="200" rx="12" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.04" stroke="#ffffff" stroke-width="0.5">
+    <line x1="0" y1="40" x2="800" y2="40"/>
+    <line x1="0" y1="80" x2="800" y2="80"/>
+    <line x1="0" y1="120" x2="800" y2="120"/>
+    <line x1="0" y1="160" x2="800" y2="160"/>
+    <line x1="160" y1="0" x2="160" y2="200"/>
+    <line x1="320" y1="0" x2="320" y2="200"/>
+    <line x1="480" y1="0" x2="480" y2="200"/>
+    <line x1="640" y1="0" x2="640" y2="200"/>
+  </g>
+
+  <!-- WiFi signal arcs -->
+  <g transform="translate(160, 120)" fill="none" stroke-linecap="round" stroke-width="5">
+    <!-- Outer arc -->
+    <path d="M -48,-48 A 68,68 0 0,1 48,-48" stroke="url(#wifi-glow)" opacity="0.5"/>
+    <!-- Middle arc -->
+    <path d="M -32,-32 A 45,45 0 0,1 32,-32" stroke="url(#wifi-glow)" opacity="0.7"/>
+    <!-- Inner arc -->
+    <path d="M -16,-16 A 23,23 0 0,1 16,-16" stroke="url(#wifi-glow)" opacity="0.9"/>
+    <!-- Dot -->
+    <circle cx="0" cy="0" r="5" fill="#4fc3f7"/>
+  </g>
+
+  <!-- Title text -->
+  <text x="400" y="85" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="36" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="1">WiFi Diagnostics</text>
+
+  <!-- Subtitle text -->
+  <text x="400" y="120" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#90caf9" text-anchor="middle" letter-spacing="0.5">Comprehensive macOS Wi-Fi &amp; Network Diagnostic Tool</text>
+
+  <!-- Decorative line -->
+  <rect x="300" y="135" width="200" height="1.5" rx="1" fill="#4fc3f7" opacity="0.3"/>
+</svg>
