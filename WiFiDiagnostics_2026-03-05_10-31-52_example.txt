@@ -1,0 +1,928 @@
+=== WiFi Diagnostics Report ===
+Generated: 2026-03-05 18:31:31 +0000
+
+--- System Information ---
+macOS: Version 26.3 (Build 25D125)
+Hardware Model: Mac16,7
+Chip: Apple M4 Pro
+Hostname: EXAMPLE-HOST
+Uptime: 1d 14h 41m
+
+--- WiFi Information ---
+Interface: en0
+Power: On
+SSID (ESSID): ExampleNet
+BSSID: 00:00:5e:00:53:00
+Interface Mode: Station
+RSSI: -36 dBm (Excellent)
+Noise: -96 dBm
+SNR: 60 dB (Excellent)
+Channel: 44
+Channel Band: 5 GHz
+Channel Width: 40 MHz
+PHY Mode: 802.11ax (Wi-Fi 6)
+Transmit Rate: 573.0 Mbps
+Security: WPA2 Personal
+MAC Address: 00:00:5e:00:53:01
+
+--- Nearby Networks ---
+  SSID                           BSSID               RSSI       Channel  Security
+  ------------------------------ ------------------- ---------- -------- --------
+  Neighbor-1                     00:00:5e:00:53:02   -72 dBm    11       Secured
+  Neighbor-1                     00:00:5e:00:53:03   -86 dBm    116      Secured
+  ExampleIoT                     00:00:5e:00:53:04   -28 dBm    44       Secured
+  ExampleIoT                     00:00:5e:00:53:05   -35 dBm    11       Secured
+  ExampleIoT                     00:00:5e:00:53:06   -52 dBm    6        Secured
+  ExampleIoT                     00:00:5e:00:53:07   -66 dBm    132      Secured
+  ExampleIoT                     00:00:5e:00:53:08   -72 dBm    60       Secured
+  ExampleIoT                     00:00:5e:00:53:09   -74 dBm    36       Secured
+  Neighbor-2                     00:00:5e:00:53:0a   -94 dBm    153      Secured
+  HP-Print-xx-example            00:00:5e:00:53:0b   -37 dBm    11       Secured
+  Neighbor-3                     00:00:5e:00:53:0c   -84 dBm    44       Secured
+  Neighbor-4                     00:00:5e:00:53:0d   -89 dBm    44       Secured
+  ExampleNet                     00:00:5e:00:53:00   -28 dBm    44       Secured
+  ExampleNet                     00:00:5e:00:53:0e   -35 dBm    11       Secured
+  ExampleNet                     00:00:5e:00:53:0f   -53 dBm    6        Secured
+  ExampleNet                     00:00:5e:00:53:10   -65 dBm    6        Secured
+  ExampleNet                     00:00:5e:00:53:11   -66 dBm    132      Secured
+  ExampleNet                     00:00:5e:00:53:12   -72 dBm    60       Secured
+  ExampleNet                     00:00:5e:00:53:13   -76 dBm    36       Secured
+  ExampleNet 5G                  00:00:5e:00:53:14   -31 dBm    44       Secured
+  ExampleNet 5G                  00:00:5e:00:53:15   -66 dBm    132      Secured
+  ExampleNet 5G                  00:00:5e:00:53:16   -72 dBm    60       Secured
+  ExampleNet 5G                  00:00:5e:00:53:17   -76 dBm    36       Secured
+  ExampleNet-Guest               00:00:5e:00:53:18   -60 dBm    108      Secured
+  ExampleNet-Guest-2             00:00:5e:00:53:19   -44 dBm    1        Secured
+  ExampleNet-Guest-2             00:00:5e:00:53:1a   -60 dBm    108      Secured
+  ExampleNet 2G                  00:00:5e:00:53:1b   -35 dBm    11       Secured
+  ISP-Hotspot-1                  00:00:5e:00:53:1c   -92 dBm    52       Secured
+  ISP-Hotspot-2                  00:00:5e:00:53:1d   -92 dBm    100      Secured
+  Carrier-Hotspot                00:00:5e:00:53:1e   -92 dBm    44       Secured
+  ISP-OpenWiFi                   00:00:5e:00:53:1f   -84 dBm    44       Secured
+  ISP-OpenWiFi                   00:00:5e:00:53:20   -91 dBm    44       Secured
+  Total networks found: 32
+
+--- Channel Utilization Analysis ---
+  Channel 44: 8 networks <-- your channel
+  Channel 11: 5 networks
+  Channel 36: 3 networks
+  Channel 132: 3 networks
+  Channel 60: 3 networks
+  Channel 6: 3 networks
+  Channel 108: 2 networks
+  Channel 116: 1 network
+  Channel 52: 1 network
+  Channel 153: 1 network
+  Channel 1: 1 network
+  Channel 100: 1 network
+  Recommendation: Channel 44 has 8 competing networks. Channel 100 has only 1.
+
+--- System Profiler WiFi Details ---
+Interface Details:
+  Card Type: Wi-Fi  (0x14E4, 0x4388)
+  Firmware Version: wl0: Dec  6 2025 00:30:14 version 23.41.8.0.41.51.201 FWID 01-990604ea
+  MAC Address: 00:00:5e:00:53:21
+  Locale: FCC
+  Country Code: US
+  Supported PHY Modes: 802.11 a/b/g/n/ac/ax
+  Supported Channels:
+    2.4 GHz: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
+    5 GHz: 36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165
+    6 GHz: 1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81, 85, 89, 93, 97, 101, 105, 109, 113, 117, 121, 125, 129, 133, 137, 141, 145, 149, 153, 157, 161, 165, 169, 173, 177, 181, 185, 189, 193, 197, 201, 205, 209, 213, 217, 221, 225, 229, 233
+  Wake On Wireless: Supported
+  Status: Connected
+Current Network Information:
+  <redacted>:
+  PHY Mode: 802.11ax
+  Channel: 44 (5GHz, 40MHz)
+  Country Code: US
+  Network Type: Infrastructure
+  Security: WPA2 Personal
+  Signal / Noise: -36 dBm / -96 dBm
+  Transmit Rate: 573
+  MCS Index: 11
+Current Network Information:
+  Network Type: Infrastructure
+
+--- Network Interfaces ---
+en4 (Ethernet Adapter (en4)):
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+en5 (Ethernet Adapter (en5)):
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+en6 (Ethernet Adapter (en6)):
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+en8 (USB 10/100/1000 LAN):
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+bridge0 (Thunderbolt Bridge):
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+en0 (Wi-Fi):
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+  IPv6: fe80::1%en0
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+  IPv4: 192.0.2.100
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+  IPv6: 2001:db8::100
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+en1 (Thunderbolt 1):
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+en2 (Thunderbolt 2):
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+en3 (Thunderbolt 3):
+  Flags: UP, BROADCAST, RUNNING, MULTICAST
+
+--- Active Network Connections ---
+TCP Connections:
+tcp4       0     80  192.0.2.100.50913    44.225.42.84.443       ESTABLISHED
+tcp4       0      0  192.0.2.100.50912    140.82.112.25.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50911    140.82.116.3.443       ESTABLISHED
+tcp4       0      0  127.0.0.1.49535      127.0.0.1.50909        ESTABLISHED
+tcp4       0      0  127.0.0.1.50909      127.0.0.1.49535        ESTABLISHED
+tcp4       0      0  127.0.0.1.49535      127.0.0.1.50908        ESTABLISHED
+tcp4       0      0  127.0.0.1.50908      127.0.0.1.49535        ESTABLISHED
+tcp4       0      0  127.0.0.1.49535      127.0.0.1.50907        ESTABLISHED
+tcp4       0      0  127.0.0.1.50907      127.0.0.1.49535        ESTABLISHED
+tcp4       0      0  127.0.0.1.49535      127.0.0.1.50906        ESTABLISHED
+tcp4       0      0  127.0.0.1.50906      127.0.0.1.49535        ESTABLISHED
+tcp4       0      0  127.0.0.1.49535      127.0.0.1.50905        ESTABLISHED
+tcp4       0      0  127.0.0.1.50905      127.0.0.1.49535        ESTABLISHED
+tcp4       0      0  192.0.2.100.50904    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50902    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  127.0.0.1.58623      127.0.0.1.50900        ESTABLISHED
+tcp4       0      0  127.0.0.1.50900      127.0.0.1.58623        ESTABLISHED
+tcp4       0      0  192.0.2.100.50894    142.250.191.59.443     ESTABLISHED
+tcp4       0      0  192.0.2.100.50892    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50890    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50888    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50886    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50881    142.250.191.59.443     ESTABLISHED
+tcp4       0      0  192.0.2.100.50876    142.250.191.59.443     ESTABLISHED
+tcp4       0      0  192.0.2.100.50874    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50872    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50870    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50868    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50866    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50860    142.250.191.59.443     ESTABLISHED
+tcp4       0      0  192.0.2.100.50857    142.250.191.59.443     ESTABLISHED
+tcp4       0      0  192.0.2.100.50852    162.247.243.29.443     ESTABLISHED
+tcp4       0      0  192.0.2.100.50851    192.0.2.113.8009       ESTABLISHED
+tcp4       0      0  192.0.2.100.50850    140.82.114.25.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50842    172.233.217.206.143    ESTABLISHED
+tcp4       0      0  192.0.2.100.50834    151.101.65.91.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50828    104.199.241.202.4070   ESTABLISHED
+tcp4       0      0  192.0.2.100.50808    34.149.66.137.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50804    104.16.2.34.443        ESTABLISHED
+tcp4       0      0  192.0.2.100.50803    104.16.2.34.443        ESTABLISHED
+tcp4       0      0  192.0.2.100.50802    104.16.2.34.443        ESTABLISHED
+tcp4       0      0  192.0.2.100.50800    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50798    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50793    142.250.191.59.443     ESTABLISHED
+tcp4       0      0  192.0.2.100.50789    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50787    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50785    160.79.104.10.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50781    185.199.108.133.443    ESTABLISHED
+tcp4       0      0  192.0.2.100.50773    35.186.224.24.443      ESTABLISHED
+tcp4       0      0  192.0.2.100.50770    142.251.2.109.993      ESTABLISHED
+
+UDP Connections:
+udp4       0      0  192.0.2.100.54703    142.250.189.238.443
+udp4       0      0  192.0.2.100.64454    142.250.191.46.443
+udp4       0      0  192.0.2.100.63784    44.235.54.54.443
+udp4       0      0  192.0.2.100.57347    17.248.245.232.443
+udp4       0      0  192.0.2.100.50010    142.251.214.131.443
+udp4       0      0  192.0.2.100.63618    142.251.151.119.443
+udp4       0      0  192.0.2.100.61265    142.251.214.142.443
+udp4       0      0  192.0.2.100.54537    17.248.245.232.443
+udp4       0      0  192.0.2.100.62312    142.251.46.174.443
+udp6       0      0  *.5353               *.*
+udp6       0      0  *.5353               *.*
+udp6       0      0  *.5353               *.*
+udp4       0      0  *.5353               *.*
+udp4       0      0  *.57621              *.*
+udp4       0      0  *.1900               *.*
+udp4       0      0  *.65058              *.*
+udp4       0      0  *.64505              *.*
+udp46      0      0  *.50958              *.*
+udp4       0      0  192.0.2.100.52088    142.250.191.74.443
+udp4       0      0  192.0.2.100.64810    142.250.191.74.443
+udp6       0      0  *.3722               *.*
+udp4       0      0  *.3722               *.*
+udp46      0      0  *.63180              *.*
+udp4       0      0  *.41641              *.*
+udp6       0      0  *.41641              *.*
+udp46      0      0  *.64928              *.*
+udp46      0      0  *.63539              *.*
+udp46      0      0  *.63783              *.*
+udp4       0      0  127.0.2.3.53         *.*
+udp4       0      0  127.0.2.2.53         *.*
+
+--- Routing Table ---
+Destination        Gateway            Netmask            Flags    Interface
+--------------------------------------------------------------------------------
+0.0.0.0            192.0.2.1          *                  UGS      en0
+0.0.0.0            198.51.100.1       *                  US       utun4
+3.33.235.18        192.0.2.1          *                  UGH      en0
+3.68.164.164       198.51.100.1       *                  US       utun4
+3.109.248.40       198.51.100.1       *                  US       utun4
+3.217.166.173      192.0.2.1          *                  UGH      en0
+198.51.100.10      198.51.100.1       *                  US       utun4
+198.51.100.11      198.51.100.1       *                  US       utun4
+198.51.100.12      198.51.100.1       *                  US       utun4
+198.51.100.13      198.51.100.1       *                  US       utun4
+198.51.100.14      198.51.100.1       *                  US       utun4
+13.248.212.111     192.0.2.1          *                  UGH      en0
+13.249.74.87       192.0.2.1          *                  UGH      en0
+15.197.213.252     192.0.2.1          *                  UGH      en0
+17.42.251.69       192.0.2.1          *                  UGH      en0
+17.57.144.25       192.0.2.1          *                  UGH      en0
+17.57.152.32       192.0.2.1          *                  UGH      en0
+17.188.171.140     192.0.2.1          *                  UGH      en0
+17.248.192.3       192.0.2.1          *                  UGH      en0
+17.248.192.4       192.0.2.1          *                  UGH      en0
+17.248.192.28      192.0.2.1          *                  UGH      en0
+17.248.192.52      192.0.2.1          *                  UGH      en0
+17.248.245.232     192.0.2.1          *                  UGH      en0
+17.253.5.134       192.0.2.1          *                  UGH      en0
+17.253.5.149       192.0.2.1          *                  UGH      en0
+17.253.83.107      192.0.2.1          *                  UGH      en0
+18.144.98.217      198.51.100.1       *                  US       utun4
+18.155.192.98      192.0.2.1          *                  UGH      en0
+18.155.202.50      192.0.2.1          *                  UGH      en0
+18.239.199.56      192.0.2.1          *                  UGH      en0
+34.107.243.93      192.0.2.1          *                  UGH      en0
+34.149.66.137      192.0.2.1          *                  UGH      en0
+34.228.147.44      192.0.2.1          *                  UGH      en0
+35.82.187.142      192.0.2.1          *                  UGH      en0
+35.186.224.24      192.0.2.1          *                  UGH      en0
+35.186.224.31      192.0.2.1          *                  UGH      en0
+35.186.224.36      192.0.2.1          *                  UGH      en0
+44.216.98.239      192.0.2.1          *                  UGH      en0
+44.225.42.84       192.0.2.1          *                  UGH      en0
+44.235.54.54       192.0.2.1          *                  UGH      en0
+45.79.97.246       192.0.2.1          *                  UGH      en0
+50.18.194.39       192.0.2.1          *                  UGH      en0
+52.5.13.197        192.0.2.1          *                  UGH      en0
+52.6.250.83        192.0.2.1          *                  UGH      en0
+52.89.90.67        192.0.2.1          *                  UGH      en0
+54.69.126.210      198.51.100.1       *                  US       utun4
+54.157.12.134      192.0.2.1          *                  UGH      en0
+54.184.75.222      192.0.2.1          *                  UGH      en0
+96.16.55.152       192.0.2.1          *                  UGH      en0
+96.16.55.163       192.0.2.1          *                  UGH      en0
+198.51.100.0       198.51.100.1       *                  US       utun4
+198.51.100.1       198.51.100.1       *                  UHL      utun4
+198.51.100.100     198.51.100.1       *                  US       utun4
+198.51.100.100     198.51.100.1       *                  UH       utun4
+104.16.2.34        192.0.2.1          *                  UGH      en0
+104.199.241.202    192.0.2.1          *                  UGH      en0
+127.0.0.0          127.0.0.1          *                  US       lo0
+127.0.0.1          127.0.0.1          *                  UHL      lo0
+127.0.2.2          127.0.2.2          *                  UHL      lo0
+127.0.2.3          127.0.2.3          *                  UHL      lo0
+134.224.4.30       192.0.2.1          *                  UGH      en0
+140.82.112.25      192.0.2.1          *                  UGH      en0
+140.82.112.26      192.0.2.1          *                  UGH      en0
+140.82.114.25      192.0.2.1          *                  UGH      en0
+140.82.116.3       192.0.2.1          *                  UGH      en0
+140.82.116.4       192.0.2.1          *                  UGH      en0
+140.82.116.6       192.0.2.1          *                  UGH      en0
+142.250.141.109    192.0.2.1          *                  UGH      en0
+142.250.141.188    192.0.2.1          *                  UGH      en0
+142.250.142.84     192.0.2.1          *                  UGH      en0
+142.250.189.174    192.0.2.1          *                  UGH      en0
+142.250.189.238    192.0.2.1          *                  UGH      en0
+142.250.189.251    192.0.2.1          *                  UGH      en0
+142.250.191.35     192.0.2.1          *                  UGH      en0
+142.250.191.46     192.0.2.1          *                  UGH      en0
+142.250.191.59     192.0.2.1          *                  UGH      en0
+142.250.191.65     192.0.2.1          *                  UGH      en0
+142.250.191.74     192.0.2.1          *                  UGH      en0
+142.251.2.109      192.0.2.1          *                  UGH      en0
+142.251.32.46      192.0.2.1          *                  UGH      en0
+142.251.45.10      192.0.2.1          *                  UGH      en0
+142.251.46.174     192.0.2.1          *                  UGH      en0
+142.251.46.234     192.0.2.1          *                  UGH      en0
+142.251.46.251     192.0.2.1          *                  UGH      en0
+142.251.151.119    192.0.2.1          *                  UGH      en0
+142.251.214.59     192.0.2.1          *                  UGH      en0
+142.251.214.131    192.0.2.1          *                  UGH      en0
+142.251.214.142    192.0.2.1          *                  UGH      en0
+142.251.214.155    192.0.2.1          *                  UGH      en0
+151.101.65.91      192.0.2.1          *                  UGH      en0
+160.79.104.10      192.0.2.1          *                  UGH      en0
+162.159.36.1       192.0.2.1          *                  UGH      en0
+162.159.138.105    192.0.2.1          *                  UGH      en0
+162.247.243.29     192.0.2.1          *                  UGH      en0
+169.254.0.0        192.0.2.100        *                  US       en0
+169.254.169.254    192.0.2.100        *                  UHS      en0
+170.114.4.239      192.0.2.1          *                  UGH      en0
+170.114.52.2       192.0.2.1          *                  UGH      en0
+198.51.100.20      198.51.100.1       *                  US       utun4
+198.51.100.21      198.51.100.1       *                  US       utun4
+198.51.100.22      198.51.100.1       *                  US       utun4
+192.0.2.0          192.0.2.100        *                  US       en0
+192.0.2.1          192.0.2.100        *                  US       en0
+192.0.2.1          192.0.2.100        *                  UH       en0
+192.0.2.33         192.0.2.100        *                  UH       en0
+192.0.2.35         192.0.2.100        *                  UH       en0
+192.0.2.37         192.0.2.100        *                  UH       en0
+192.0.2.100        192.0.2.100        *                  UH       en0
+192.0.2.102        192.0.2.100        *                  UH       en0
+192.0.2.107        192.0.2.100        *                  UH       en0
+192.0.2.112        192.0.2.100        *                  UH       en0
+192.0.2.113        192.0.2.100        *                  UH       en0
+192.0.2.114        192.0.2.100        *                  UH       en0
+192.0.2.116        192.0.2.100        *                  UH       en0
+192.0.2.117        192.0.2.100        *                  UH       en0
+192.0.2.119        192.0.2.100        *                  UH       en0
+192.0.2.121        192.0.2.100        *                  UH       en0
+192.0.2.122        192.0.2.100        *                  UH       en0
+192.0.2.131        192.0.2.100        *                  UH       en0
+192.0.2.240        192.0.2.100        *                  UH       en0
+192.0.2.242        192.0.2.100        *                  UH       en0
+192.0.2.162        192.0.2.100        *                  UH       en0
+192.0.2.100        192.0.2.100        *                  US       en0
+192.0.2.100        192.0.2.100        *                  UHL      lo0
+192.0.2.255        192.0.2.100        *                  UH       en0
+192.0.2.251        192.0.2.1          *                  UGH      en0
+198.51.100.23      198.51.100.1       *                  US       utun4
+172.64.41.4        192.0.2.1          *                  UGH      en0
+172.233.217.206    192.0.2.1          *                  UGH      en0
+174.129.128.48     192.0.2.1          *                  UGH      en0
+185.199.108.133    192.0.2.1          *                  UGH      en0
+185.199.110.153    192.0.2.1          *                  UGH      en0
+192.73.240.132     192.0.2.1          *                  UGH      en0
+192.73.244.245     192.0.2.1          *                  UGH      en0
+198.51.100.30      198.51.100.1       *                  US       utun4
+198.51.100.31      198.51.100.1       *                  US       utun4
+192.200.0.108      192.0.2.1          *                  UGH      en0
+199.165.136.100    192.0.2.1          *                  UGH      en0
+208.111.34.178     192.0.2.1          *                  UGH      en0
+208.111.40.216     192.0.2.1          *                  UGH      en0
+216.239.34.181     192.0.2.1          *                  UGH      en0
+224.0.0.0          192.0.2.100        *                  US       en0
+224.0.0.0          198.51.100.1       *                  US       utun4
+224.0.0.251        192.0.2.100          *                  UH       en0
+239.255.255.250    192.0.2.100        *                  UH       en0
+255.255.255.255    192.0.2.100        *                  US       en0
+255.255.255.255    198.51.100.1       *                  US       utun4
+Total routes parsed: 147
+Default Gateway: 192.0.2.1
+Routes for en4:
+Routes for en5:
+Routes for en6:
+Routes for en8:
+Routes for bridge0:
+Routes for en0:
+  Addresses: 192.0.2.100
+  Router: 192.0.2.1
+  Subnet Masks: 255.255.255.0
+Routes for en1:
+Routes for en2:
+Routes for en3:
+
+--- ARP Table ---
+
+--- Network Interface Statistics ---
+Name       Mtu   Network       Address              Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll
+lo0        16384 <Link#1>                         1522920     0 1272863135  1522920     0 1272863135     0
+lo0        16384 127           localhost          1522920     - 1272863135  1522920     - 1272863135     -
+lo0        16384 localhost     ::1                1522920     - 1272863135  1522920     - 1272863135     -
+lo0        16384 example-hos   fe80::2            1522920     - 1272863135  1522920     - 1272863135     -
+lo0        16384 127           connectivity-ch    1522920     - 1272863135  1522920     - 1272863135     -
+lo0        16384 127           connectivity-ch    1522920     - 1272863135  1522920     - 1272863135     -
+gif0*      1280  <Link#2>                               0     0          0        0     0          0     0
+stf0*      1280  <Link#3>                               0     0          0        0     0          0     0
+anpi1      1500  <Link#4>      00:00:5e:00:53:22        0     0          0        0     0          0     0
+anpi2      1500  <Link#5>      00:00:5e:00:53:23        0     0          0        0     0          0     0
+anpi0      1500  <Link#6>      00:00:5e:00:53:24        0     0          0        0     0          0     0
+en4        1500  <Link#7>      00:00:5e:00:53:25        0     0          0        0     0          0     0
+en5        1500  <Link#8>      00:00:5e:00:53:26        0     0          0        0     0          0     0
+en6        1500  <Link#9>      00:00:5e:00:53:27        0     0          0        0     0          0     0
+en1        1500  <Link#10>     00:00:5e:00:53:28        0     0          0        0     0     232557     0
+en2        1500  <Link#11>     00:00:5e:00:53:29        0     0          0        0     0     232557     0
+en3        1500  <Link#12>     00:00:5e:00:53:2a        0     0          0        0     0     232557     0
+bridge0    1500  <Link#15>     00:00:5e:00:53:28        0     0          0        0     0          0     0
+ap1*       1500  <Link#13>     00:00:5e:00:53:2b        0     0          0        0     0          0     0
+en0        1500  <Link#14>     00:00:5e:00:53:21 33701334     0 41693586313 10365066     0 6300099847     0
+en0        1500  example-hos   fe80::3           33701334     - 41693586313 10365066     - 6300099847     -
+en0        1500  192.0.2/24    192.0.2.100       33701334     - 41693586313 10365066     - 6300099847     -
+en0        1500  2001:db8::100 2001:db8::100     33701334     - 41693586313 10365066     - 6300099847     -
+awdl0      1500  <Link#16>     00:00:5e:00:53:2c     6025     0    2031166    30282     0    4770525     0
+awdl0      1500  fe80::4       fe80::5               6025     -    2031166    30282     -    4770525     -
+llw0       1500  <Link#17>     00:00:5e:00:53:2c        0     0          0        0     0          0     0
+llw0       1500  fe80::4       fe80::6                  0     -          0        0     -          0     -
+utun0      1500  <Link#18>                              0     0          0        1     0         80     0
+utun0      1500  example-hos   fe80::7                  0     -          0        1     -         80     -
+utun1      1380  <Link#19>                              0     0          0       19     0       3152     0
+utun1      1380  example-hos   fe80::8                  0     -          0       19     -       3152     -
+utun2      2000  <Link#20>                              0     0          0       19     0       3152     0
+utun2      2000  example-hos   fe80::9                  0     -          0       19     -       3152     -
+utun3      1000  <Link#21>                              0     0          0       19     0       3152     0
+utun3      1000  example-hos   fe80::a                  0     -          0       19     -       3152     -
+utun4      1280  <Link#22>                         229223     0  147995932   203005     0   20296872     0
+utun4      1280  example-hos   fe80::b             229223     -  147995932   203005     -   20296872     -
+utun4      1280  198.51.100.1/ example-host.t      229223     -  147995932   203005     -   20296872     -
+utun4      1280  2001:db8:1::1 2001:db8:1::1       229223     -  147995932   203005     -   20296872     -
+utun5      1400  <Link#23>                              0     0          0        0     0          0     0
+utun6      1380  <Link#24>                             58     0      17008       33     0       4630     0
+utun6      1380  example-hos   fe80::c                 58     -      17008       33     -       4630     -
+utun7      1380  <Link#25>                             64     0      21326       37     0       5184     0
+utun7      1380  example-hos   fe80::d                 64     -      21326       37     -       5184     -
+utun8      1380  <Link#26>                              0     0          0       19     0       3152     0
+utun8      1380  example-hos   fe80::e                  0     -          0       19     -       3152     -
+utun9      1380  <Link#27>                              0     0          0       19     0       3152     0
+utun9      1380  example-hos   fe80::f                  0     -          0       19     -       3152     -
+utun10     1380  <Link#33>                            150     0      26604       65     0       9219     0
+utun10     1380  example-hos   fe80::10               150     -      26604       65     -       9219     -
+utun11     1380  <Link#34>                              0     0          0        4     0        320     0
+utun11     1380  example-hos  fe80::11                  0     -          0        4     -        320     -
+en8        1500  <Link#32>    00:00:5e:00:53:2d         0     0          0        0     0          0     0
+
+--- Protocol Statistics ---
+tcp:
+  0 packet sent
+  0 data packet (0 byte)
+  0 data packet (0 byte) retransmitted
+  0 ack-only packet (0 delayed)
+  0 URG only packet
+  0 window probe packet
+  0 window update packet
+  0 control packet
+  0 data packet sent after flow control
+  0 packet received
+  0 packet (0 byte) received in-sequence
+  0 completely duplicate packet (0 byte)
+  0 old duplicate packet
+  0 received packet dropped due to low memory
+  0 packet with some dup. data (0 byte duped)
+  0 out-of-order packet (0 byte)
+  0 packet (0 byte) of data after window
+  0 window update packet
+  0 packet recovered after loss
+  0 packet received after close
+  0 discarded because packet too short
+  0 connection request
+  0 connection accept
+  0 bad connection attempt
+  0 connection established (including accepts)
+  0 connection closed (including 0 drop)
+  0 connection updated cached RTT on close
+  0 connection updated cached RTT variance on close
+  0 connection updated cached ssthresh on close
+  0 connection initialized RTT from route cache
+  0 connection initialized RTT variance from route cache
+  0 connection initialized ssthresh from route cache
+  0 embryonic connection dropped
+  0 retransmit timeout
+  0 connection dropped by rexmit timeout
+  0 connection dropped after retransmitting FIN
+  0 unnecessary packet retransmissions
+  0 connection dropped by persist timeout
+  0 connection dropped by keepalive
+  0 connection dropped by keepalive offload
+  0 correct data packet header prediction
+  0 segment retransmitted in RACK recovery episodes
+  0 early retransmit done
+  0 time retransmit timeout triggered after probe
+  0 time probe packets were sent for an interface
+  0 time couldn't send probe packets for an interface
+  0 time recovered last packet
+  0 SACK based rescue retransmit
+  0 client connection attempted to negotiate ECN
+  0 client connection successfully negotiated ECN
+  0 time graceful fallback to Non-ECN connection
+  0 time lost ECN negotiating SYN, followed by retransmission
+  0 server connection attempted to negotiate ECN
+  0 server connection successfully negotiated ECN
+  0 time lost ECN negotiating SYN-ACK, followed by retransmission
+  0 connection received CE atleast once
+  0 connection received ECE atleast once
+  0 connection using ECN have seen packet loss but no CE
+  0 connection using ECN have seen packet loss and CE
+  0 connection using ECN received CE but no packet loss
+  0 connection fell back to non-ECN due to SYN-loss
+  0 connection fell back to non-ECN due to reordering
+  0 connection fell back to non-ECN due to excessive CE-markings
+  0 connection fell back caused by connection drop due to RST
+  0 connection fell back due to drop after multiple retransmits
+  0 time received AccECN SYN packet with Not-ECT
+  0 time received AccECN SYN packet with ECT1
+  0 time received AccECN SYN packet with ECT0
+  0 time received AccECN SYN packet with CE
+  0 time packet reordering was detected on a connection
+  0 time transmitted packets were reordered
+  0 time retransmission was avoided by delaying recovery
+  0 retransmission due to tail loss
+  0 time recovered from bad retransmission using DSACK
+  0 connection were dropped after long sleep
+  0 time a connection-attempt with TFO fell back to regular TCP
+  0 time a TFO-connection blackhole'd
+  0 FIN_WAIT timeout drop
+  0 time could not reply to packet
+  0 duplicate RST packet for port unreachable suppressed
+  0 RST packet for port unreachable not suppressed
+udp:
+  97277 dropped due to no socket
+  347519 dropped due to full socket buffers
+  16562 duplicate IMCP packets for port unreachable suppressed
+  80715 ICMP packets for port unreachable not suppressed
+ip:
+  11658073 total packets received
+  0 packet forced to software checksum
+  0 with ip length > max ip packet size
+  0 dropped (dup or out of space)
+  0 dropped after timeout
+  9744032 packets for this host
+  24360 packets for unknown/unsupported protocol
+  2104540 packets forwarded (0 packet fast forwarded)
+  68240 packets not forwardable
+  849 packets received for unknown multicast group
+  140873 input packets not chained due to collision
+  11215819 input packets processed in a chain
+  299500 input packets unable to chain
+  1119568 input packet chains processed with length greater than 2
+  554541 input packet chains processed with length greater than 4
+  0 input packet did not go through list processing path
+  0 input packet that passed the weak ES interface address match
+  13111 input packets with no interface address match
+  8051984 packets sent from this host
+  347249 packets sent with fabricated ip header
+  0 output packet dropped due to no bufs, etc.
+  5948 output packets discarded due to no route
+  0 tunneling packet that can't find gif
+  0 packet dropped due to no bufs for control data
+  0 packet dropped due to NECP policy
+icmp:
+  60091 calls to icmp_error
+  0 error not generated 'cuz old message was icmp
+  0 group-source queries dropped
+ipsec:
+  0 inbound packet processed successfully
+  0 inbound packet violated process security policy
+  0 inbound packet with no SA available
+  0 invalid inbound packet
+  0 inbound packet failed due to insufficient memory
+  0 inbound packet failed getting SPI
+  0 inbound packet failed on AH replay check
+  0 inbound packet failed on ESP replay check
+  0 inbound packet considered authentic by AH
+  0 inbound packet failed on AH authentication
+  0 inbound packet considered authentic by ESP
+  0 inbound packet failed on ESP authentication
+  0 outbound packet processed successfully
+  0 outbound packet violated process security policy
+  0 outbound packet with no SA available
+  0 invalid outbound packet
+  0 outbound packet failed due to insufficient memory
+  0 outbound packet with no route
+  86205 total ARP packets received
+  0 total packet dropped due to lack of memory
+  0 total packet held awaiting ARP reply
+  1001 total packets dropped due to no ARP entry
+  1538 total packets dropped during ARP entry removal
+mptcp:
+  0 data packet sent
+  0 data packet received
+  0 packet with an invalid MPCAP option
+  0 packet with an invalid MPJOIN option
+  0 DSS option drop
+  0 number of join ack retransmits
+  0 MPTCP packet dropped for lack of memory
+  0 MPTCP duplicate-only packet received
+  0 MPTCP packet with data after window
+  0 successfull handover mode connection that started on Wi-Fi
+  0 successfull handover mode connection that started on cellular
+  0 successfull handover mode connection that started on Wi-Fi
+  0 successfull handover mode connection that started on cellular
+  0 successfull handover mode connection that started on Wi-Fi
+  0 successfull handover mode connection that started on cellular
+  0 successfull handover mode connection that started on Wi-Fi
+  0 successfull handover mode connection that started on cellular
+  0 aggregate mode connection that negotiated MPTCP
+  0 connection that moved traffic away from cellular when starting on cellular
+  0 time an MPTCP connection triggered cellular
+ip6:
+  632768 total packets received
+  0 packet forced to software checksum
+  0 dropped (dup or out of space)
+  0 dropped after timeout
+  582216 packets for this host
+  0 input packet that passed the weak ES interface address match
+  69 input packets with no interface address match
+  0 packet forwarded
+  250 packets not forwardable
+  250 multicast packets which we didn't join
+  0 packet whose headers are not continuous
+  0 tunneling packet that can't find gif
+  0 packet discarded due to too may headers
+  0 packet dropped due to no bufs for control data
+  0 input packet dropped due to too short length
+  0 input packet dropped due to missing CLAT46 IPv6 address
+  0 input packet dropped due to missing CLAT46 IPv4 address
+  0 input packet dropped due to CLAT46 IPv4 address derivation failure
+  0 input packet dropped due to CLAT46 IP header translation failure
+  0 input packet dropped due to CLAT46 protocol translation failure
+  0 input packet dropped due to CLAT46 fragment translation failure
+  0 input packet dropped due to invalid pbuf
+  0 input IPv4 packet dropped on CLAT46 enabled interface
+  0 input packet dropped due to CLAT46 failures
+  0 input packet successfully translated from IPv6 to IPv4
+  162758 packets sent from this host
+  0 packet sent with fabricated ip header
+  0 output packet dropped due to no bufs, etc.
+  272307 output packets discarded due to no route
+  0 packet that violated scope rules
+  0 packet dropped due to NECP policy
+  0 output packet dropped due to missing CLAT46 IPv6 address
+  0 output packet dropped due to CLAT46 IPv6 address synthesis failure
+  0 output packet dropped due to CLAT46 IP header translation failure
+  0 output packet dropped due to CLAT46 protocol translation failure
+  0 output packet dropped due to CLAT46 fragment translation failure
+  0 output packet dropped due to invalid pbuf
+  0 output packet dropped due to CLAT46 failures
+  0 output packet successfully translated from IPv4 to IPv6
+icmp6:
+  1885 calls to icmp_error
+  0 error not generated because old message was icmp error or so
+  0 error not generated because rate limitation
+  Histogram of error messages to be generated:
+  0 packet too big
+  0 dropped fragmented NDP message
+ipsec6:
+  0 inbound packet processed successfully
+  0 inbound packet violated process security policy
+  0 inbound packet with no SA available
+  0 invalid inbound packet
+  0 inbound packet failed due to insufficient memory
+  0 inbound packet failed getting SPI
+  0 inbound packet failed on AH replay check
+  0 inbound packet failed on ESP replay check
+  0 inbound packet considered authentic by AH
+  0 inbound packet failed on AH authentication
+  0 inbound packet considered authentic by ESP
+  0 inbound packet failed on ESP authentication
+  0 outbound packet processed successfully
+  0 outbound packet violated process security policy
+  0 outbound packet with no SA available
+  0 invalid outbound packet
+  0 outbound packet failed due to insufficient memory
+  0 outbound packet with no route
+rip6:
+  0 message dropped due to no socket
+  0 multicast message dropped due to no socket
+  0 message dropped due to full socket buffers
+  0 message dropped due to full socket buffers
+  1261 connection attempts
+  0 connection failure
+  20698 packets dropped due to full socket buffers
+  0 enqueuedata failure because could not allocate a packet
+  0 enqueue error message failure
+  3 match so wake packet calls
+  19 match ch wake packet calls
+  19 IPv4 wake packets
+  3 IPv6 wake packets
+  22 TCP wake packets
+  0 UDP wake packet
+  0 ISAKMP NAT traversal wake packet
+  0 ESP wake packet
+  0 bad protocol wake packet
+  0 bad family wake packet
+  0 wake packet event
+  0 duplicate wake packet event in same wake cycle
+  194 wake packet events undelivered
+  22 unattributed wake packet events
+  0 duplicate unattributed wake packet event in same wake cycle
+  0 unattributed wake packet event undelivered
+  0 unattributed wake packet received with null interface
+  0 bad packet without wake flag
+  0 pure fragment wake packet
+  0 packet with incomplete TCP header
+  0 packet with incomplete UDP header
+  0 deferred matching of ISAKMP NAT traversal wake packet
+  0 spurious no wake from sleep packet event
+  0 delayed attributed wake packet event
+  0 delayed unattributed wake packet event
+  0 undelivered delayed wake packet event
+  0 connection idle wake
+  0 LPW connection idle wake
+  0 LPW not idle connection wake
+  0 ignored wake packet in same wake cycle
+  0 delayed wake packet
+
+--- DNS Configuration and Tests ---
+Configured DNS Servers:
+  • 198.51.100.100
+Search Domains:
+  • example-tailnet.ts.net
+  • home.arpa
+
+--- DNS Resolution Tests ---
+Resolving apple.com:
+  CFHost lookup:
+    • 17.253.144.10
+    • 2620:149:af0::10
+  getaddrinfo lookup:
+    • 17.253.144.10
+    • 2620:149:af0::10
+  dscacheutil (cache) lookup:
+    • 17.253.144.10
+Resolving mail.google.com:
+  CFHost lookup:
+    • 172.217.12.101
+    • 2607:f8b0:4005:803::2005
+  getaddrinfo lookup:
+    • 172.217.12.101
+    • 2607:f8b0:4005:803::2005
+  dscacheutil (cache) lookup:
+    • 172.217.12.101
+Resolving 1.1.1.1:
+  CFHost lookup:
+    • 1.1.1.1
+  getaddrinfo lookup:
+    • 1.1.1.1
+  dscacheutil (cache) lookup:
+    • 1.1.1.1
+Resolving 8.8.8.8:
+  CFHost lookup:
+    • 8.8.8.8
+  getaddrinfo lookup:
+    • 8.8.8.8
+  dscacheutil (cache) lookup:
+    • 8.8.8.8
+
+--- Reverse DNS Tests ---
+Default Gateway (192.0.2.1):
+  • No reverse DNS record
+
+--- Network Reachability Tests ---
+Reachability for Default Gateway (192.0.2.1):
+  Reachable: Yes
+  Connection Required: No
+  Connection Type: WiFi, WiFi, Other
+  DNS Support: Yes
+Reachability for apple.com:
+  Reachable: Yes
+  Connection Required: No
+  Connection Type: WiFi, WiFi, Other
+  DNS Support: Yes
+Reachability for mail.google.com:
+  Reachable: Yes
+  Connection Required: No
+  Connection Type: WiFi, WiFi, Other
+  DNS Support: Yes
+Reachability for 1.1.1.1:
+  Reachable: Yes
+  Connection Required: No
+  Connection Type: WiFi, WiFi, Other
+  DNS Support: Yes
+Reachability for 8.8.8.8:
+  Reachable: Yes
+  Connection Required: No
+  Connection Type: WiFi, WiFi, Other
+  DNS Support: Yes
+
+--- Network Connection Tests (TCP) ---
+TCP connection to apple.com:443:
+  Connection established in 9.377 ms
+  Status: Success
+TCP connection to mail.google.com:443:
+  Connection established in 11.515 ms
+  Status: Success
+TCP connection to 1.1.1.1:443:
+  Connection established in 7.137 ms
+  Status: Success
+TCP connection to 8.8.8.8:443:
+  Connection established in 12.610 ms
+  Status: Success
+
+--- HTTPS Connectivity Test ---
+Testing HTTPS connection to apple.com:
+  Response time: 64.960 ms
+  HTTP Status: 200
+  Result: Success
+Testing HTTPS connection to mail.google.com:
+  Response time: 612.929 ms
+  HTTP Status: 200
+  Result: Success
+
+--- External IP Address ---
+External IP: 203.0.113.50
+Detection time: 322.870 ms
+
+--- Gateway Ping / Latency Test ---
+Ping to gateway (192.0.2.1):
+  5 packets transmitted, 5 packets received, 0.0% packet loss
+  round-trip min/avg/max/stddev = 2.807/41.609/111.121/47.028 ms
+Ping to apple.com:
+  5 packets transmitted, 5 packets received, 0.0% packet loss
+  round-trip min/avg/max/stddev = 40.408/73.647/104.888/21.094 ms
+Ping to mail.google.com:
+  5 packets transmitted, 5 packets received, 0.0% packet loss
+  round-trip min/avg/max/stddev = 5.405/19.631/70.048/25.233 ms
+Ping to 1.1.1.1:
+  5 packets transmitted, 5 packets received, 0.0% packet loss
+  round-trip min/avg/max/stddev = 4.981/6.306/7.371/0.839 ms
+Ping to 8.8.8.8:
+  5 packets transmitted, 5 packets received, 0.0% packet loss
+  round-trip min/avg/max/stddev = 6.193/7.228/9.540/1.199 ms
+
+--- DHCP Lease Information ---
+ipconfig_server_port failed (os/kern) unknown error code (44c)
+
+--- Captive Portal Detection ---
+  Status: No captive portal detected (direct internet access)
+
+--- mDNS/Bonjour Service Discovery ---
+  Found 1 service type:
+    _services._dns-sd._udp.local.
+
+--- Security and Firewall Information ---
+
+--- Application Firewall Status ---
+Unable to retrieve firewall status (may require admin privileges)
+
+--- Packet Filter (pf) Status ---
+Packet Filter: Disabled or not configured
+
+--- VPN Connections ---
+Available network connection services in the current set (*=enabled):
+* (Disconnected)   871B4B23-8675-4839-9DAF-73A64DCD14F7 IPSec              "VPN 2"                          [IPSec]
+* (Disconnected)   335B4A18-3827-4A17-BBC4-81F4307B49B2 PPP --> L2TP       "VPN 1"                          [PPP:L2TP]
+* (Disconnected)   7B507230-7439-4869-9A11-7C682346FCFA PPP --> L2TP       "VPN"                            [PPP:L2TP]
+* (Connected)      C0CAD5DC-4B55-494D-ABDE-7177B1D1F9EF VPN (io.tailscale.ipn.macsys) "Tailscale"           [VPN:io.tailscale.ipn.macsys]
+
+--- Proxy Settings ---
+No proxy configured
+Proxy Exceptions:
+
+--- Debug Log ---
+[10:31:31.834] Starting WiFi diagnostics collection...
+[10:31:31.835] Progress: 10% - Initializing diagnostics...
+[10:31:31.835] Collecting WiFi information...
+[10:31:31.835] Collecting network interface information...
+[10:31:31.835] Collecting active network connections and routing information...
+[10:31:31.835] Collecting DNS information...
+[10:31:31.836] Location Services authorization status: 3
+[10:31:31.836] Found WiFi interface: en0
+[10:31:31.837] Interface power: true
+[10:31:31.837] Interface service active: true
+[10:31:31.838] Found 9 network interfaces
+[10:31:31.838] Processing interface: en4
+[10:31:31.838] Processing interface: en5
+[10:31:31.838] Processing interface: en6
+[10:31:31.838] Processing interface: en8
+[10:31:31.838] Processing interface: bridge0
+[10:31:31.838] Interface security: WPA2 Personal
+[10:31:31.838] Processing interface: en0
+[10:31:31.839] Processing interface: en1
+[10:31:31.839] Processing interface: en2
+[10:31:31.839] Processing interface: en3
+[10:31:31.839] Network interface information collection completed
+[10:31:31.839] Interface mode: Station
+[10:31:31.845] Connected to SSID: ExampleNet
+[10:31:31.845] Attempting to get BSSID regardless of SSID status...
+[10:31:31.849] CoreWLAN BSSID result: 00:00:5e:00:53:00
+[10:31:31.849] BSSID from CoreWLAN: 00:00:5e:00:53:00
+[10:31:31.855] Scanning for nearby networks...
+[10:31:31.856] Starting network scan on main thread...
+[10:31:31.884] Progress: 12% - DNS Tests — Resolving apple.com (1/4)...
+[10:31:31.941] Progress: 16% - DNS Tests — Resolving apple.com (1/4)...
+[10:31:32.049] Progress: 17% - DNS Tests — Resolving mail.google.com (2/4)...
+[10:31:32.096] Progress: 19% - DNS Tests — Resolving 1.1.1.1 (3/4)...
+[10:31:32.110] Progress: 21% - DNS Tests — Resolving 8.8.8.8 (4/4)...
+[10:31:32.158] Progress: 23% - DNS Tests — Reachability apple.com (1/4)...
+[10:31:32.158] Progress: 25% - DNS Tests — Reachability mail.google.com (2/4)...
+[10:31:32.158] Progress: 27% - DNS Tests — Reachability 1.1.1.1 (3/4)...
+[10:31:32.158] Progress: 29% - DNS Tests — Reachability 8.8.8.8 (4/4)...
+[10:31:32.158] Progress: 30% - DNS Tests — TCP test apple.com (1/4)...
+[10:31:32.168] Progress: 32% - DNS Tests — TCP test mail.google.com (2/4)...
+[10:31:32.179] Progress: 34% - DNS Tests — TCP test 1.1.1.1 (3/4)...
+[10:31:32.187] Progress: 36% - DNS Tests — TCP test 8.8.8.8 (4/4)...
+[10:31:32.199] Progress: 38% - DNS Tests — HTTPS test apple.com (1/2)...
+[10:31:32.264] Progress: 40% - DNS Tests — HTTPS test mail.google.com (2/2)...
+[10:31:32.877] Progress: 42% - DNS Tests — Detecting external IP...
+[10:31:32.877] Detecting external IP address...
+[10:31:33.200] External IP detected: 203.0.113.50
+[10:31:33.200] DNS information collection completed
+[10:31:33.200] Progress: 44% - Ping Tests — Starting ping tests...
+[10:31:34.930] Progress: 48% - Ping Tests — Starting ping tests...
+[10:31:35.579] Active connections and routing information collection completed
+[10:31:35.579] Progress: 56% - Ping Tests — Starting ping tests...
+[10:31:36.169] Progress: 56% - Ping Tests — Pinging apple.com (1/4)...
+[10:31:36.318] Network scan completed
+[10:31:36.318] Found 32 networks in 4.5 seconds
+[10:31:40.309] Progress: 60% - Ping Tests — Pinging mail.google.com (2/4)...
+[10:31:41.290] WiFi information collection completed
+[10:31:41.290] Progress: 72% - Ping Tests — Pinging mail.google.com (2/4)...
+[10:31:44.440] Progress: 76% - Ping Tests — Pinging 1.1.1.1 (3/4)...
+[10:31:48.566] Progress: 81% - Ping Tests — Pinging 8.8.8.8 (4/4)...
+[10:31:52.602] Progress: 90% - Ping Tests — Complete
+[10:31:52.602] Progress: 90% - Security — Checking firewall...
+[10:31:52.603] Failed to get firewall status: Error Domain=NSCocoaErrorDomain Code=4 "The file “socketfilterfw” doesn’t exist." UserInfo={NSFilePath=/usr/libexec/ApplicationFirewall/socketfilterfw}
+[10:31:52.604] Failed to get firewall settings: Error Domain=NSCocoaErrorDomain Code=4 "The file “socketfilterfw” doesn’t exist." UserInfo={NSFilePath=/usr/libexec/ApplicationFirewall/socketfilterfw}
+[10:31:52.654] Progress: 96% - Security — Complete
+[10:31:52.654] Diagnostics collection completed
+[10:31:52.654] Progress: 98% - Finalizing — Writing report...
+[10:31:52.654] Report size: 44519 characters
+[10:31:52.654] Progress: 100% - Finalizing — Complete
+[10:31:52.654] Progress: 100% - Report complete
