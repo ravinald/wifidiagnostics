@@ -22,6 +22,41 @@ import Network
 import CoreLocation
 import AppKit
 
+// MARK: - Host validation
+// Used both by the report path (getTestHosts) and by HostChecksView at save time.
+// RFC 1123-ish hostnames: 1–253 chars total, labels 1–63 chars, alnum + hyphens,
+// no leading/trailing hyphen per label.
+enum HostValidator {
+    static func isIPAddress(_ host: String) -> Bool {
+        var sin = sockaddr_in()
+        var sin6 = sockaddr_in6()
+        return host.withCString { cStr in
+            inet_pton(AF_INET, cStr, &sin.sin_addr) == 1 ||
+            inet_pton(AF_INET6, cStr, &sin6.sin6_addr) == 1
+        }
+    }
+
+    static func isValidHostname(_ host: String) -> Bool {
+        let trimmed = host.hasSuffix(".") ? String(host.dropLast()) : host
+        guard (1...253).contains(trimmed.count) else { return false }
+        let labels = trimmed.split(separator: ".", omittingEmptySubsequences: false)
+        guard !labels.isEmpty else { return false }
+        for label in labels {
+            guard (1...63).contains(label.count) else { return false }
+            guard label.first != "-", label.last != "-" else { return false }
+            for ch in label {
+                let isAlnum = ch.isASCII && (ch.isLetter || ch.isNumber)
+                guard isAlnum || ch == "-" else { return false }
+            }
+        }
+        return true
+    }
+
+    static func isValid(_ host: String) -> Bool {
+        isIPAddress(host) || isValidHostname(host)
+    }
+}
+
 // Constants for sysctl
 private let CTL_NET = 4
 private let PF_ROUTE = 17
@@ -306,21 +341,26 @@ class WiFiDiagnosticsCollector {
 
     private func getTestHosts() -> [String] {
         if let saved = UserDefaults.standard.string(forKey: "customTestHosts") {
-            let hosts = saved.components(separatedBy: .newlines)
+            let entries = saved.components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
-            if !hosts.isEmpty { return hosts }
+            // Defense-in-depth: argv pattern already prevents shell injection,
+            // but a typo'd or hostile entry shouldn't reach ping/dscacheutil.
+            var valid: [String] = []
+            for entry in entries {
+                if HostValidator.isValid(entry) {
+                    valid.append(entry)
+                } else {
+                    log("hosts: rejecting invalid entry from customTestHosts: \(entry)")
+                }
+            }
+            if !valid.isEmpty { return valid }
         }
         return ["apple.com", "mail.google.com", "1.1.1.1", "8.8.8.8"]
     }
 
     private func isIPAddress(_ host: String) -> Bool {
-        var sin = sockaddr_in()
-        var sin6 = sockaddr_in6()
-        return host.withCString { cStr in
-            inet_pton(AF_INET, cStr, &sin.sin_addr) == 1 ||
-            inet_pton(AF_INET6, cStr, &sin6.sin6_addr) == 1
-        }
+        HostValidator.isIPAddress(host)
     }
     
     func cancel() {
@@ -492,7 +532,7 @@ class WiFiDiagnosticsCollector {
         if self.isCancelled {
             log("Report generation cancelled")
             DispatchQueue.main.async {
-                completion("Report generation was cancelled.")
+                completion("You cancelled the report.")
             }
             return
         }
@@ -550,7 +590,7 @@ class WiFiDiagnosticsCollector {
             
             
             """
-            log("Location Services denied or restricted - BSSID and network scanning will not be available")
+            log("location: Location Services denied — cannot read BSSID or scan networks")
         } else if locationStatus == .notDetermined {
             info += "⚠️ Requesting Location Services permission... Please check the permission prompt.\n\n"
             log("Location Services not determined - requesting permission")
@@ -703,61 +743,94 @@ class WiFiDiagnosticsCollector {
             
             """
         } else {
-            let scanSemaphore = DispatchSemaphore(value: 0)
-            var scanResult: Set<CWNetwork>?
-            var scanError: Error?
-            
-            // Note: scanForNetworks must be called on the main thread in some cases
+            // Run multiple scans and union by BSSID — a single CoreWLAN scan often
+            // misses APs (short per-channel dwell, DFS passive-only, beacon timing).
+            let totalScans = 3
+            var unionedByBSSID: [String: CWNetwork] = [:]
+            var firstScanError: Error?
+            var firstScanTimedOut = false
             let scanStartTime = Date()
-            
-            DispatchQueue.main.async { [weak self] in
-                do {
-                    self?.log("Starting network scan on main thread...")
-                    scanResult = try interface.scanForNetworks(withSSID: nil)
-                    self?.log("Network scan completed")
-                } catch {
-                    scanError = error
-                    self?.log("Network scan error: \(error)")
+
+            for scanIndex in 0..<totalScans {
+                let scanSemaphore = DispatchSemaphore(value: 0)
+                var scanResult: Set<CWNetwork>?
+                var iterError: Error?
+
+                DispatchQueue.main.async { [weak self] in
+                    do {
+                        self?.log("Starting network scan \(scanIndex + 1)/\(totalScans) on main thread...")
+                        scanResult = try interface.scanForNetworks(withSSID: nil)
+                        self?.log("Network scan \(scanIndex + 1) completed: \(scanResult?.count ?? 0) networks")
+                    } catch {
+                        iterError = error
+                        self?.log("wifi_scan: scanForNetworks(iter=\(scanIndex + 1)/\(totalScans)) failed: \(error)")
+                    }
+                    scanSemaphore.signal()
                 }
-                scanSemaphore.signal()
+
+                let scanTimeout = DispatchTime.now() + .seconds(10)
+                if scanSemaphore.wait(timeout: scanTimeout) == .timedOut {
+                    log("Network scan \(scanIndex + 1) timed out after 10 seconds")
+                    if scanIndex == 0 { firstScanTimedOut = true }
+                    break
+                }
+                if let err = iterError {
+                    if scanIndex == 0 { firstScanError = err }
+                    break
+                }
+                guard let networks = scanResult else { break }
+
+                for n in networks {
+                    // Hidden/nil-BSSID entries get a unique key so they're never deduped.
+                    let key = n.bssid ?? "nil-\(scanIndex)-\(ObjectIdentifier(n).hashValue)"
+                    if let existing = unionedByBSSID[key], existing.rssiValue >= n.rssiValue {
+                        continue
+                    }
+                    unionedByBSSID[key] = n
+                }
             }
-            
-            let scanTimeout = DispatchTime.now() + .seconds(10)  // Increased timeout
-            if scanSemaphore.wait(timeout: scanTimeout) == .timedOut {
+
+            if firstScanTimedOut {
                 let elapsed = Date().timeIntervalSince(scanStartTime)
                 log("Network scan timed out after \(String(format: "%.1f", elapsed)) seconds")
                 info += "  Scan timed out (10 seconds)\n"
                 info += "  Note: Network scanning may take longer in areas with many networks\n"
-            } else if let error = scanError {
+            } else if let error = firstScanError {
                 log("Network scan failed: \(error.localizedDescription)")
                 info += "  Unable to scan: \(error.localizedDescription)\n"
-                
-                // Check for specific error codes
+
                 let nsError = error as NSError
                 if nsError.code == 82 {
                     info += "  This may be due to Location Services permissions\n"
                 } else if nsError.code == -3900 {
                     info += "  WiFi interface may be busy or not ready\n"
                 }
-            } else if let networks = scanResult {
+            } else {
+                let networks = Array(unionedByBSSID.values)
                 let scanDuration = Date().timeIntervalSince(scanStartTime)
-                log("Found \(networks.count) networks in \(String(format: "%.1f", scanDuration)) seconds")
+                log("Found \(networks.count) unique networks across \(totalScans) scans in \(String(format: "%.1f", scanDuration)) seconds")
                 
                 if networks.isEmpty {
                     info += "  No networks found\n"
                 } else {
-                    // Sort networks by SSID (network name), case-insensitive, then by RSSI (best to worst)
+                    // Connected ESSID first (BSSIDs sorted by RSSI), then remaining
+                    // ESSIDs alphabetically (case-insensitive) with BSSIDs by RSSI.
+                    let connectedSSID = ssid?.lowercased()
                     let sortedNetworks = networks.sorted { network1, network2 in
                         let ssid1 = (network1.ssid ?? "").lowercased()
                         let ssid2 = (network2.ssid ?? "").lowercased()
-                        
-                        if ssid1 == ssid2 {
-                            // Same SSID, sort by RSSI (higher is better, so reverse comparison)
-                            return network1.rssiValue > network2.rssiValue
-                        } else {
-                            // Different SSIDs, sort alphabetically
-                            return ssid1 < ssid2
+
+                        let isConnected1 = connectedSSID != nil && ssid1 == connectedSSID
+                        let isConnected2 = connectedSSID != nil && ssid2 == connectedSSID
+
+                        if isConnected1 != isConnected2 {
+                            return isConnected1
                         }
+
+                        if ssid1 == ssid2 {
+                            return network1.rssiValue > network2.rssiValue
+                        }
+                        return ssid1 < ssid2
                     }
                     
                     // Add column headers
@@ -825,9 +898,6 @@ class WiFiDiagnosticsCollector {
                         }
                     }
                 }
-            } else {
-                log("Network scan completed but no results or error")
-                info += "  No scan results available\n"
             }
         }
         
@@ -1026,7 +1096,7 @@ class WiFiDiagnosticsCollector {
                 }
             }
         } catch {
-            log("TCP netstat failed: \(error)")
+            log("netstat: run(/usr/sbin/netstat -anp tcp) failed: \(error)")
         }
         
         // Also get UDP connections
@@ -1056,7 +1126,7 @@ class WiFiDiagnosticsCollector {
                 }
             }
         } catch {
-            log("UDP netstat failed: \(error)")
+            log("netstat: run(/usr/sbin/netstat -anp udp) failed: \(error)")
         }
         
         return tcpOutput + udpOutput
@@ -1265,7 +1335,8 @@ class WiFiDiagnosticsCollector {
                 }
             }
         } catch {
-            info += "    • Failed: \(error.localizedDescription)\n"
+            log("dns: dscacheutil(host=\(hostname)) failed: \(error)")
+            info += "    • dscacheutil(host=\(hostname)) failed: \(error.localizedDescription)\n"
         }
         
         return info
@@ -1353,9 +1424,9 @@ class WiFiDiagnosticsCollector {
                 }
             }
         } catch {
-            log("Failed to run ioreg: \(error)")
+            log("bssid: ioreg(-l -n AirPort_BrcmNIC -r) failed: \(error)")
         }
-        
+
         // Method 3: Try alternative ioreg approach for different hardware
         let altTask = Process()
         altTask.launchPath = "/usr/sbin/ioreg"
@@ -1386,7 +1457,7 @@ class WiFiDiagnosticsCollector {
                 }
             }
         } catch {
-            log("Failed to run alternative ioreg: \(error)")
+            log("bssid: ioreg(-l -n AppleBCMWLANCore -r) failed: \(error)")
         }
         
         // Method 4: Try using networksetup command
@@ -1407,7 +1478,7 @@ class WiFiDiagnosticsCollector {
                 // This will give us current network name but not BSSID
             }
         } catch {
-            log("Failed to run networksetup: \(error)")
+            log("bssid: networksetup(-getairportnetwork en0) failed: \(error)")
         }
         
         // Method 5: Try using system_profiler with XML output for more detail
@@ -1443,7 +1514,7 @@ class WiFiDiagnosticsCollector {
                 }
             }
         } catch {
-            log("Failed to parse system_profiler XML: \(error)")
+            log("bssid: system_profiler(SPAirPortDataType -xml) parse failed: \(error)")
         }
         
         log("Could not get BSSID from any method")
@@ -1503,7 +1574,7 @@ class WiFiDiagnosticsCollector {
             }
             
             if task.isRunning {
-                log("system_profiler timed out after \(timeout) seconds")
+                log("wifi_info: system_profiler(SPAirPortDataType -detailLevel full) timed out after \(timeout)s")
                 task.terminate()
                 return nil
             }
@@ -1513,7 +1584,7 @@ class WiFiDiagnosticsCollector {
                 return output
             }
         } catch {
-            log("Failed to run system_profiler: \(error)")
+            log("wifi_info: system_profiler(SPAirPortDataType -detailLevel full) failed: \(error)")
         }
         
         return nil
@@ -1713,7 +1784,8 @@ class WiFiDiagnosticsCollector {
                 info += "  No mDNS response received\n"
             }
         } catch {
-            info += "  mDNS discovery failed: \(error.localizedDescription)\n"
+            log("mdns: dns-sd(-B _services._dns-sd._udp local.) failed: \(error)")
+            info += "  mDNS discovery (dns-sd -B _services._dns-sd._udp local.) failed: \(error.localizedDescription)\n"
         }
 
         return info
@@ -1744,6 +1816,9 @@ class WiFiDiagnosticsCollector {
 
     private func generateSystemInfoHeader() -> String {
         var info = "--- System Information ---\n"
+
+        // Binary version stamp — lets a pasted report map back to a build.
+        info += "WiFi Diagnostics: v\(BuildInfo.fullVersion)\n"
 
         // macOS version
         info += "macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
@@ -1829,7 +1904,8 @@ class WiFiDiagnosticsCollector {
                 info += "  Ping timed out\n"
             }
         } catch {
-            info += "  Ping failed: \(error.localizedDescription)\n"
+            log("ping: ping(-c \(count) -W 2000 \(host)) failed: \(error)")
+            info += "  ping(host=\(host), count=\(count)) failed: \(error.localizedDescription)\n"
         }
 
         return info
@@ -1880,7 +1956,8 @@ class WiFiDiagnosticsCollector {
                 info += "  ipconfig timed out\n"
             }
         } catch {
-            info += "  Failed to retrieve DHCP info: \(error.localizedDescription)\n"
+            log("dhcp: ipconfig(getpacket en0) failed: \(error)")
+            info += "  ipconfig(getpacket en0) failed: \(error.localizedDescription)\n"
         }
 
         return info
@@ -2356,8 +2433,8 @@ extension WiFiDiagnosticsCollector {
                 }
             }
         } catch {
-            log("ARP command failed: \(error)")
-            info = "Unable to retrieve ARP table\n"
+            log("arp: arp(-a) failed: \(error)")
+            info = "arp(-a) failed: \(error.localizedDescription)\n"
         }
         
         return info
@@ -2386,8 +2463,8 @@ extension WiFiDiagnosticsCollector {
                 }
             }
         } catch {
-            log("Network statistics command failed: \(error)")
-            info = "Unable to retrieve network statistics\n"
+            log("netstat: netstat(-i -b) failed: \(error)")
+            info = "netstat(-i -b) failed: \(error.localizedDescription)\n"
         }
         
         // Add per-protocol statistics
@@ -2448,8 +2525,8 @@ extension WiFiDiagnosticsCollector {
                 }
             }
         } catch {
-            log("Protocol statistics command failed: \(error)")
-            info = "Unable to retrieve protocol statistics\n"
+            log("netstat: netstat(-s) failed: \(error)")
+            info = "netstat(-s) failed: \(error.localizedDescription)\n"
         }
         
         return info
@@ -2500,8 +2577,8 @@ extension WiFiDiagnosticsCollector {
                 info += output
             }
         } catch {
-            log("Failed to get firewall status: \(error)")
-            info += "Unable to retrieve firewall status (may require admin privileges)\n"
+            log("firewall: socketfilterfw(--getglobalstate) failed: \(error)")
+            info += "socketfilterfw(--getglobalstate) failed: \(error.localizedDescription) (may require admin privileges)\n"
         }
         
         // Get firewall settings
@@ -2522,7 +2599,7 @@ extension WiFiDiagnosticsCollector {
                 info += output
             }
         } catch {
-            log("Failed to get firewall settings: \(error)")
+            log("firewall: socketfilterfw(--getallowsigned) failed: \(error)")
         }
         
         return info
@@ -2568,15 +2645,15 @@ extension WiFiDiagnosticsCollector {
                             info += "Active Rules: \(ruleCount)\n"
                         }
                     } catch {
-                        log("Failed to get pf rules: \(error)")
+                        log("pf: pfctl(-s rules) failed: \(error)")
                     }
                 } else {
                     info += "Packet Filter: Disabled or not configured\n"
                 }
             }
         } catch {
-            log("Failed to get pf status: \(error)")
-            info += "Unable to retrieve packet filter status (may require root privileges)\n"
+            log("pf: pfctl(-s info) failed: \(error)")
+            info += "pfctl(-s info) failed: \(error.localizedDescription) (may require root privileges)\n"
         }
         
         return info
@@ -2605,8 +2682,8 @@ extension WiFiDiagnosticsCollector {
                 info += "No VPN connections configured\n"
             }
         } catch {
-            log("Failed to get VPN status: \(error)")
-            info += "Unable to retrieve VPN status\n"
+            log("vpn: scutil(--nc list) failed: \(error)")
+            info += "scutil(--nc list) failed: \(error.localizedDescription)\n"
         }
         
         return info
