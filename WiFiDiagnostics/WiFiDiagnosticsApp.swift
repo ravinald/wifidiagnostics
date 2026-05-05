@@ -84,7 +84,7 @@ struct WiFiDiagnosticsApp: App {
                 try reportContent.write(toFile: outputPath, atomically: true, encoding: .utf8)
                 print("Report saved to: \(outputPath)")
             } catch {
-                print("Error saving report: \(error)")
+                print("app: writeReport(path=\(outputPath)) failed: \(error). Falling back to stdout:")
                 print("\n" + reportContent)
             }
         }
@@ -313,23 +313,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error = error {
-                    print("Failed to show notification: \(error)")
+                    print("app: notification.add(title=\"WiFi Diagnostics\") failed: \(error)")
                 }
             }
 
             return fileURL.path
         } catch {
-            print("Failed to save report: \(error)")
+            print("app: writeReport(path=\(fileURL.path)) failed: \(error)")
             return nil
         }
     }
-    
+
     private func showDiagnosticsWindowForPath(_ path: String) {
         do {
             let content = try String(contentsOfFile: path, encoding: .utf8)
             showDiagnosticsWindow(with: content)
         } catch {
-            print("Failed to read report file: \(error)")
+            print("app: readReport(path=\(path)) failed: \(error)")
         }
     }
     

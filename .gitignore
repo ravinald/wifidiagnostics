@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Internal docs (session changelogs, working notes — never tracked)
+docs-internal/
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+
+# Build artifacts
+build/
+DerivedData/
+*.xcarchive
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+
+# Project-local Claude config
+CLAUDE.md

@@ -19,13 +19,14 @@ import SwiftUI
 struct HostChecksView: View {
     @Environment(\.dismiss) var dismiss
     @State private var hostsText: String = ""
+    @State private var validationError: String?
 
     static let defaultHosts = "apple.com\nmail.google.com\n1.1.1.1\n8.8.8.8"
     private static let userDefaultsKey = "customTestHosts"
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Enter hostnames or IP addresses, one per line. Each will be checked for DNS resolution and pinged 5 times. The default gateway is always checked automatically.")
+            Text("Enter hostnames or IP addresses, one per line. We resolve each via DNS and ping it 5 times. The default gateway is always checked automatically.")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -35,9 +36,17 @@ struct HostChecksView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .border(Color(NSColor.separatorColor), width: 1)
 
+            if let validationError = validationError {
+                Text(validationError)
+                    .font(.callout)
+                    .foregroundColor(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack {
                 Button("Restore Defaults") {
                     hostsText = Self.defaultHosts
+                    validationError = nil
                 }
 
                 Spacer()
@@ -48,8 +57,14 @@ struct HostChecksView: View {
                 .keyboardShortcut(.cancelAction)
 
                 Button("Save") {
-                    UserDefaults.standard.set(hostsText, forKey: Self.userDefaultsKey)
-                    closeWindow()
+                    let invalid = invalidEntries(in: hostsText)
+                    if invalid.isEmpty {
+                        UserDefaults.standard.set(hostsText, forKey: Self.userDefaultsKey)
+                        validationError = nil
+                        closeWindow()
+                    } else {
+                        validationError = "Invalid host\(invalid.count == 1 ? "" : "s"): \(invalid.joined(separator: ", "))"
+                    }
                 }
                 .keyboardShortcut(.defaultAction)
             }
@@ -64,6 +79,12 @@ struct HostChecksView: View {
                 hostsText = Self.defaultHosts
             }
         }
+    }
+
+    private func invalidEntries(in text: String) -> [String] {
+        text.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !HostValidator.isValid($0) }
     }
 
     private func closeWindow() {

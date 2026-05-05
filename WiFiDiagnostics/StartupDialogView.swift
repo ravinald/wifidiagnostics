@@ -183,7 +183,7 @@ struct StartupDialogView: View {
             }
             launchAtLoginEnabled = SMAppService.mainApp.status == .enabled
         } catch {
-            print("Failed to setup launch at startup: \(error)")
+            print("startup_dialog: SMAppService.mainApp.register() failed: \(error)")
             launchAtLoginEnabled = false
         }
 
